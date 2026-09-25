@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { analyse, moneyAtStake, monthLabel, realisedSaving, summarise } from "@/lib/analysis";
+import { actionPlan, analyse, costOfInaction, moneyAtStake, monthLabel, realisedByMonth, realisedSaving, summarise } from "@/lib/analysis";
 import { StatusPill } from "@/components/ActionTracker";
 import { readStore } from "@/lib/store";
 import { fmtAed } from "@/lib/tariff";
@@ -43,6 +43,15 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
   const totalKwh = usable.reduce((a, b) => a + b.kwh, 0);
   const stake = moneyAtStake(store.sites, findings);
   const co2 = store.settings.emissionFactor.enabled ? (totalKwh * store.settings.emissionFactor.kgCo2ePerKwh) / 1000 : null;
+  const inactionBySite = new Map<string, number>();
+  for (const f of findings) {
+    if (!["SPIKE_VS_BASELINE", "SUSTAINED_DRIFT", "SLAB_BAND_JUMP", "PEER_OUTLIER"].includes(f.type) || store.actions[f.id]?.status === "done") continue;
+    const site = store.sites.find((s) => s.id === f.siteId);
+    if (!site) continue;
+    const cost = costOfInaction(f, site, store.bills, store.settings).aed;
+    inactionBySite.set(f.siteId, Math.max(inactionBySite.get(f.siteId) ?? 0, cost));
+  }
+  const lostSinceDetected = [...inactionBySite.values()].reduce((sum, value) => sum + value, 0);
 
   const realisedById = new Map(
     findings.map((f) => {
@@ -54,6 +63,18 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
   const verifiedAed = [...realisedById.values()].reduce((a, r) => a + Math.max(0, r?.realisedAed ?? 0), 0);
   const doneCount = findings.filter((f) => store.actions[f.id]?.status === "done").length;
   const inProgress = findings.filter((f) => store.actions[f.id]?.status === "assigned").length;
+  const plan = actionPlan(store.sites, findings, store.actions);
+  const doneConsumption = findings.filter((f) => ["SPIKE_VS_BASELINE", "SUSTAINED_DRIFT", "SLAB_BAND_JUMP", "PEER_OUTLIER"].includes(f.type) && store.actions[f.id]?.status === "done");
+  const savingsByMonth = new Map<string, number>();
+  for (const f of doneConsumption) {
+    const site = store.sites.find((s) => s.id === f.siteId);
+    if (!site) continue;
+    for (const point of realisedByMonth(f, site, store.bills, store.settings)) savingsByMonth.set(point.billMonth, (savingsByMonth.get(point.billMonth) ?? 0) + point.aed);
+  }
+  const savingsHistory = [...savingsByMonth.entries()].sort(([a], [b]) => a.localeCompare(b)).reduce<{ billMonth: string; value: number }[]>((history, [billMonth, value]) => {
+    const previous = history[history.length - 1]?.value ?? 0;
+    return [...history, { billMonth, value: previous + value }];
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -69,7 +90,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-5 md:gap-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-6">
         <Stat label="Total spend" value={fmtAed(totalAed)} sub={`${totalKwh.toLocaleString()} kWh`} />
         <Stat label="Efficiency opportunity" value={fmtAed(stake.efficiencyMonthlyAed)} sub={`/month · ${fmtAed(stake.efficiencyAnnualAed)} annualised (scenario)`} />
         <Stat label="Refund to claim" value={fmtAed(stake.recoverableAed)} sub={stake.recoverableAed > 0 ? "billing errors to dispute with DEWA" : "no billing errors found"} />
@@ -78,6 +99,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
           value={fmtAed(verifiedAed)}
           sub={doneCount > 0 ? `${doneCount} action${doneCount === 1 ? "" : "s"} done · ${inProgress} in progress · measured on the next bill` : inProgress > 0 ? `${inProgress} action${inProgress === 1 ? "" : "s"} in progress` : "mark actions done on a finding to track realised savings"}
         />
+        <Stat label="Lost since detected" value={fmtAed(lostSinceDetected)} sub="excess paid after the finding first appeared" />
         <Stat
           label="Scope 2 (location-based)"
           value={co2 !== null ? `${co2.toFixed(1)} tCO₂e` : "—"}
@@ -95,6 +117,78 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
           </div>
           <p className="mb-1 text-xs text-slate-500">Excess consumption = cost above baseline/band across flagged months (largest finding per site-month). Billing errors = printed total above the correct tariff, claimable once.</p>
           <StakeChart rows={stake.bySite} />
+        </Card>
+      )}
+
+      {plan.length > 0 && (
+        <Card>
+          <div className="flex flex-wrap items-baseline justify-between gap-3">
+            <div className="text-sm font-medium">Action plan — ranked by payback</div>
+            <Link href="/api/plan.csv" className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium hover:border-slate-500">
+              Export CSV
+            </Link>
+          </div>
+          <div className="mt-3 hidden overflow-x-auto sm:block">
+            <table className="w-full min-w-[760px] text-sm">
+              <thead className="text-left text-xs uppercase text-slate-500">
+                <tr>
+                  <th className="py-1 pr-3">Action</th>
+                  <th className="pr-3">Site</th>
+                  <th className="pr-3 text-right">AED/month</th>
+                  <th className="pr-3 text-right">AED/year</th>
+                  <th className="pr-3 text-right">Capex</th>
+                  <th className="pr-3 text-right">Payback</th>
+                  <th className="pr-3">Owner</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {plan.map((row) => (
+                  <tr key={row.findingId} className="border-t border-slate-100">
+                    <td className="py-2 pr-3">
+                      <Link href={`/findings/${encodeURIComponent(row.findingId)}`} className="font-medium text-amber-700 hover:underline">{row.action}</Link>
+                    </td>
+                    <td className="pr-3">{row.siteName}</td>
+                    <td className="pr-3 text-right font-mono">{fmtAed(row.monthlyAed)}</td>
+                    <td className="pr-3 text-right font-mono">{fmtAed(row.annualAed)}</td>
+                    <td className="pr-3 text-right font-mono">{fmtAed(row.capexAed)}</td>
+                    <td className="pr-3 text-right">{row.paybackMonths === null ? "—" : row.paybackMonths === 0 ? "Immediate" : `${row.paybackMonths.toFixed(1)} mo`}</td>
+                    <td className="pr-3 text-slate-600">{row.owner ?? "—"}</td>
+                    <td><StatusPill status={row.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <ul className="mt-3 space-y-2 sm:hidden">
+            {plan.map((row) => (
+              <li key={row.findingId}>
+                <Link href={`/findings/${encodeURIComponent(row.findingId)}`} className="block rounded-lg border border-slate-200 p-3 active:bg-amber-50">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="font-medium">{row.action}</div>
+                    <StatusPill status={row.status} />
+                  </div>
+                  <div className="mt-1 text-sm text-slate-600">{row.siteName}</div>
+                  <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-slate-500">
+                    <span>AED/month <strong className="font-mono text-slate-700">{fmtAed(row.monthlyAed)}</strong></span>
+                    <span>AED/year <strong className="font-mono text-slate-700">{fmtAed(row.annualAed)}</strong></span>
+                    <span>Capex <strong className="font-mono text-slate-700">{fmtAed(row.capexAed)}</strong></span>
+                    <span>Payback <strong className="text-slate-700">{row.paybackMonths === null ? "—" : row.paybackMonths === 0 ? "Immediate" : `${row.paybackMonths.toFixed(1)} mo`}</strong></span>
+                  </div>
+                  {(row.owner || row.dueDate) && <div className="mt-2 text-xs text-slate-500">{row.owner ?? "Unassigned"}{row.dueDate ? ` · due ${row.dueDate}` : ""}</div>}
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-3 border-t border-slate-100 pt-3 text-sm font-medium">Total annual opportunity: {fmtAed(plan.reduce((sum, row) => sum + row.annualAed, 0))}</div>
+        </Card>
+      )}
+
+      {doneConsumption.length > 0 && (
+        <Card>
+          <div className="text-sm font-medium">Verified savings to date</div>
+          <TrendChart height={220} unit="AED" series={[{ name: "Cumulative saving", color: "#059669", points: savingsHistory }]} />
+          <p className="text-xs text-slate-500">Cumulative realised saving vs each finding&apos;s flagged run-rate, from actions marked done</p>
         </Card>
       )}
 

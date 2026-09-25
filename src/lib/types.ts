@@ -175,6 +175,7 @@ export interface ActionRecord {
   dueDate?: string;
   /** kWh reduction the team committed to (from the scenario slider). */
   targetKwh?: number;
+  capexAed?: number;
   updatedAt: string;
 }
 

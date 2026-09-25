@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { calcBill, DEFAULT_TARIFF, round2, scenarioSaving, splitIntoSlabs } from "../tariff";
-import { analyse, moneyAtStake, realisedSaving } from "../analysis";
+import { actionPlan, analyse, costOfInaction, moneyAtStake, realisedByMonth, realisedSaving } from "../analysis";
 import { weatherExpectedPct } from "../weather";
 import { parseCsv, toBill, type BillExtraction } from "../extract";
 import type { Bill, Site } from "../types";
@@ -200,5 +200,41 @@ describe("weather adjustment and verified savings", () => {
     expect(r.realisedAed).toBeCloseTo(1300 * (0.32 + 0.06) * 1.05, 0);
     expect(r.achievedPct).toBeGreaterThan(80);
     expect(r.achievedPct).toBeLessThan(100);
+  });
+
+  it("sums cost of inaction across later bills and returns zero when none exist", () => {
+    const initial = [mk("2026-04", 5000), mk("2026-05", 5000), mk("2026-06", 5000), mk("2026-07", 6500)];
+    const spike = analyse([site], initial, settings).find((f) => f.type === "SPIKE_VS_BASELINE" && f.billMonth === "2026-07")!;
+    const later = [...initial, mk("2026-08", 5200), mk("2026-09", 5400)];
+    const cost = costOfInaction(spike, site, later, settings);
+    const expected = later.slice(-2).reduce((sum, b) => {
+      const excess = Math.max(0, b.kwh / 28 - spike.metrics.baselineKwhPerDay!) * 28;
+      return sum + round2(excess * (0.32 + 0.06) * 1.05);
+    }, 0);
+    expect(cost.months).toBe(2);
+    expect(cost.aed).toBe(round2(expected));
+    expect(cost.trace).toHaveLength(3);
+    expect(costOfInaction(spike, site, initial, settings)).toEqual({ months: 0, aed: 0, latestMonth: null, trace: [] });
+  });
+
+  it("ranks refunds first, excludes done actions, and computes payback", () => {
+    const bills = [mk("2026-03", 5000), mk("2026-04", 5000), mk("2026-05", 5000), mk("2026-06", 6500)];
+    const spike = analyse([site], bills, settings).find((f) => f.type === "SPIKE_VS_BASELINE" && f.billMonth === "2026-06")!;
+    const mismatch = { ...spike, id: "TOTAL_MISMATCH:s:2026-06", type: "TOTAL_MISMATCH" as const, metrics: { recoverableAed: 500 }, excessAed: 500 };
+    const rows = actionPlan([site], [spike, mismatch], {
+      [spike.id]: { findingId: spike.id, status: "open", capexAed: 1000, updatedAt: "" },
+      [mismatch.id]: { findingId: mismatch.id, status: "open", capexAed: 0, updatedAt: "" },
+    });
+    expect(rows[0].kind).toBe("refund");
+    expect(rows[1].paybackMonths).toBeCloseTo(1000 / spike.excessAed, 2);
+    expect(actionPlan([site], [spike], { [spike.id]: { findingId: spike.id, status: "done", updatedAt: "" } })).toEqual([]);
+  });
+
+  it("returns non-negative realised saving for every later bill", () => {
+    const bills = [mk("2026-04", 5000), mk("2026-05", 5000), mk("2026-06", 5000), mk("2026-07", 6500), mk("2026-08", 5200), mk("2026-09", 7000)];
+    const spike = analyse([site], bills, settings).find((f) => f.type === "SPIKE_VS_BASELINE" && f.billMonth === "2026-07")!;
+    const history = realisedByMonth(spike, site, bills, settings);
+    expect(history).toHaveLength(2);
+    expect(history.every((x) => x.aed >= 0)).toBe(true);
   });
 });

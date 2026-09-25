@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { analyse, kwhPerDay, monthLabel, periodDays, realisedSaving } from "@/lib/analysis";
+import { analyse, costOfInaction, kwhPerDay, monthLabel, periodDays, realisedSaving } from "@/lib/analysis";
 import { readStore } from "@/lib/store";
 import { fmtAed, round2 } from "@/lib/tariff";
 import { Card, SeverityBadge, typeLabel } from "@/components/ui";
@@ -32,6 +32,7 @@ export default async function FindingPage({ params }: PageProps<"/findings/[id]"
   const evidenceIds = new Set(f.evidenceBillIds);
   const record = store.actions[f.id];
   const realised = isConsumption ? realisedSaving(f, site, store.bills, store.settings, record?.targetKwh) : null;
+  const inaction = isConsumption ? costOfInaction(f, site, store.bills, store.settings) : null;
 
   const peerMonths = [...new Set(evidence.map((b) => b.billMonth))].sort();
   const peerSites = store.sites
@@ -171,7 +172,7 @@ export default async function FindingPage({ params }: PageProps<"/findings/[id]"
         </table>
       </Card>
 
-      <ActionTracker finding={f} record={record} realised={realised} isConsumption={isConsumption} />
+      <ActionTracker finding={f} record={record} realised={realised} inaction={inaction} isConsumption={isConsumption} />
 
       <ExplainPanel findingId={f.id} initial={explanation ?? null} />
       <ContractorPanel finding={f} site={site} contractors={store.contractors} />

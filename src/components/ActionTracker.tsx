@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { monthLabel, type RealisedSaving } from "@/lib/analysis";
+import { monthLabel, type InactionCost, type RealisedSaving } from "@/lib/analysis";
 import { fmtAed } from "@/lib/tariff";
 import type { ActionRecord, ActionStatus, Finding } from "@/lib/types";
 import { updateActionStatus } from "@/app/actions";
@@ -20,11 +20,13 @@ export function ActionTracker({
   finding,
   record,
   realised,
+  inaction,
   isConsumption,
 }: {
   finding: Finding;
   record: ActionRecord | undefined;
   realised: RealisedSaving | null;
+  inaction: InactionCost | null;
   isConsumption: boolean;
 }) {
   const status = record?.status ?? "open";
@@ -37,7 +39,7 @@ export function ActionTracker({
         <StatusPill status={status} realised={status === "done" ? realised : null} />
       </div>
 
-      <form action={updateActionStatus} className="grid gap-3 sm:grid-cols-[1fr_1fr_1fr_1fr_auto] sm:items-end">
+      <form action={updateActionStatus} className="grid gap-3 sm:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto] sm:items-end">
         <input type="hidden" name="findingId" value={finding.id} />
         <label className="text-xs text-slate-600">
           Status
@@ -63,11 +65,44 @@ export function ActionTracker({
         ) : (
           <div />
         )}
+        <label className="text-xs text-slate-600">
+          One-off cost (AED)
+          <input name="capexAed" inputMode="numeric" defaultValue={record?.capexAed ?? ""} placeholder="e.g. 2500" className={`mt-1 ${input}`} />
+        </label>
         <button className="rounded-md bg-slate-900 px-4 py-3 text-sm font-medium text-white sm:py-2">Save</button>
       </form>
 
       {isConsumption && (
-        <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
+        <>
+          {inaction && record?.status !== "done" && (
+            <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+              {inaction.months === 0 ? (
+                <>No bill after {monthLabel(finding.billMonth)} yet — each month unresolved costs about {fmtAed(finding.excessAed)}</>
+              ) : (
+                <>
+                  <div className="font-medium">
+                    Cost of doing nothing: {fmtAed(inaction.aed)} lost across {inaction.months} bills since {monthLabel(finding.billMonth)}
+                  </div>
+                  <details className="mt-2 text-xs text-red-800">
+                    <summary className="cursor-pointer">Show calculation</summary>
+                    <table className="mt-1 w-full">
+                      <tbody>
+                        {inaction.trace.map((l, i) => (
+                          <tr key={i} className="border-t border-red-200 align-top">
+                            <td className="py-1 pr-2">
+                              {l.label} <span className="font-mono text-[10px]">{l.formula}</span>
+                            </td>
+                            <td className="py-1 text-right font-mono whitespace-nowrap">{fmtAed(l.value)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </details>
+                </>
+              )}
+            </div>
+          )}
+          <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
           {realised ? (
             <>
               <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -110,7 +145,8 @@ export function ActionTracker({
               Awaiting the next bill after {monthLabel(finding.billMonth)} — upload it and WattWatch will report realised vs scenario saving here.
             </div>
           )}
-        </div>
+          </div>
+        </>
       )}
     </Card>
   );

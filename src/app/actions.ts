@@ -192,6 +192,7 @@ export async function updateActionStatus(formData: FormData) {
   const owner = String(formData.get("owner") ?? "").trim() || undefined;
   const dueDate = String(formData.get("dueDate") ?? "").trim() || undefined;
   const target = Number(String(formData.get("targetKwh") ?? "").replace(/,/g, ""));
+  const capex = Number(String(formData.get("capexAed") ?? "").replace(/,/g, ""));
 
   update((s) => {
     s.actions[findingId] = {
@@ -200,6 +201,7 @@ export async function updateActionStatus(formData: FormData) {
       owner,
       dueDate,
       targetKwh: Number.isFinite(target) && target > 0 ? Math.round(target) : undefined,
+      capexAed: Number.isFinite(capex) && capex > 0 ? Math.round(capex) : undefined,
       updatedAt: new Date().toISOString(),
     };
   });

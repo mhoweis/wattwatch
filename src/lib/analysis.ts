@@ -6,6 +6,8 @@ import type {
   Settings,
   Site,
   Thresholds,
+  ActionRecord,
+  ActionStatus,
 } from "./types";
 import { calcBill, marginalRate, round2 } from "./tariff";
 import { COOLING_SHARE, weatherExpectedPct } from "./weather";
@@ -499,4 +501,133 @@ export function realisedSaving(f: Finding, site: Site, bills: Bill[], settings: 
       { label: "Target for the period", formula: `${targetKwhForPeriod} kWh × marginal rate`, value: targetAed, unit: "AED" },
     ],
   };
+}
+
+export interface InactionCost {
+  months: number;
+  aed: number;
+  latestMonth: string | null;
+  trace: CalcLine[];
+}
+
+const consumptionTypes = new Set<Finding["type"]>(["SPIKE_VS_BASELINE", "SUSTAINED_DRIFT", "SLAB_BAND_JUMP", "PEER_OUTLIER"]);
+
+export function costOfInaction(f: Finding, site: Site, bills: Bill[], settings: Settings): InactionCost {
+  const later = bills
+    .filter((b) => b.siteId === site.id && b.status === "ok" && b.billMonth > f.billMonth)
+    .sort((a, b) => a.billMonth.localeCompare(b.billMonth));
+  if (later.length === 0) return { months: 0, aed: 0, latestMonth: null, trace: [] };
+
+  const baseline = f.metrics.baselineKwhPerDay;
+  const trace: CalcLine[] = [];
+  let total = 0;
+  for (const b of later) {
+    let aed: number;
+    let formula: string;
+    if (baseline !== undefined) {
+      const current = kwhPerDay(b);
+      const days = periodDays(b);
+      const excessKwh = Math.max(0, current - baseline) * days;
+      const rate = marginalRate(b.kwh, settings.tariff, site.premisesType, b.fuelSurchargeRate);
+      aed = round2(excessKwh * rate);
+      formula = `max(0, ${round2(current)} − ${round2(baseline)}) × ${days} days × ${rate}`;
+    } else {
+      aed = round2(f.excessAed);
+      formula = `${round2(f.excessAed)} excess AED × 1 bill`;
+    }
+    total += aed;
+    trace.push({ label: `${monthLabel(b.billMonth)} excess`, formula, value: aed, unit: "AED" });
+  }
+  total = round2(total);
+  trace.push({ label: "Total cost of inaction", formula: "sum later bill excess", value: total, unit: "AED" });
+  return { months: later.length, aed: total, latestMonth: later[later.length - 1].billMonth, trace };
+}
+
+export interface PlanRow {
+  findingId: string;
+  siteId: string;
+  siteName: string;
+  action: string;
+  kind: "efficiency" | "refund";
+  monthlyAed: number;
+  annualAed: number;
+  capexAed: number;
+  paybackMonths: number | null;
+  owner?: string;
+  status: ActionStatus;
+  dueDate?: string;
+}
+
+const actionText: Partial<Record<Finding["type"], string>> = {
+  SPIKE_VS_BASELINE: "Bring consumption back to baseline",
+  SUSTAINED_DRIFT: "Reverse month-on-month drift (audit + AC service)",
+  SLAB_BAND_JUMP: "Stay under the tariff band boundary",
+  PEER_OUTLIER: "Close the gap to peer branches",
+};
+
+export function actionPlan(sites: Site[], findings: Finding[], actions: Record<string, ActionRecord>): PlanRow[] {
+  const siteById = new Map(sites.map((s) => [s.id, s]));
+  const rows: PlanRow[] = [];
+  for (const f of findings) {
+    const record = actions[f.id];
+    const status = record?.status ?? "open";
+    if (status === "done") continue;
+    const site = siteById.get(f.siteId);
+    if (!site) continue;
+    if (consumptionTypes.has(f.type) && f.excessAed > 0) {
+      const monthlyAed = round2(f.excessAed);
+      const capexAed = record?.capexAed ?? 0;
+      rows.push({
+        findingId: f.id,
+        siteId: f.siteId,
+        siteName: site.name,
+        action: actionText[f.type] ?? f.headline,
+        kind: "efficiency",
+        monthlyAed,
+        annualAed: round2(monthlyAed * 12),
+        capexAed,
+        paybackMonths: capexAed > 0 && monthlyAed > 0 ? round2(capexAed / monthlyAed) : capexAed === 0 ? 0 : null,
+        owner: record?.owner,
+        status,
+        dueDate: record?.dueDate,
+      });
+    } else if (f.type === "TOTAL_MISMATCH" && (f.metrics.recoverableAed ?? 0) > 0) {
+      const annualAed = round2(f.metrics.recoverableAed);
+      const capexAed = record?.capexAed ?? 0;
+      rows.push({
+        findingId: f.id,
+        siteId: f.siteId,
+        siteName: site.name,
+        action: "Dispute with DEWA billing",
+        kind: "refund",
+        monthlyAed: 0,
+        annualAed,
+        capexAed,
+        paybackMonths: capexAed === 0 ? 0 : null,
+        owner: record?.owner,
+        status,
+        dueDate: record?.dueDate,
+      });
+    }
+  }
+  return rows.sort((a, b) => {
+    if (a.kind !== b.kind) return a.kind === "refund" ? -1 : 1;
+    if (a.paybackMonths === null && b.paybackMonths !== null) return 1;
+    if (a.paybackMonths !== null && b.paybackMonths === null) return -1;
+    if (a.paybackMonths !== b.paybackMonths) return (a.paybackMonths ?? Infinity) - (b.paybackMonths ?? Infinity);
+    return b.annualAed - a.annualAed;
+  });
+}
+
+export function realisedByMonth(f: Finding, site: Site, bills: Bill[], settings: Settings): { billMonth: string; aed: number }[] {
+  const current = f.metrics.currentKwhPerDay;
+  if (current === undefined || current <= 0) return [];
+  return bills
+    .filter((b) => b.siteId === site.id && b.status === "ok" && b.billMonth > f.billMonth)
+    .sort((a, b) => a.billMonth.localeCompare(b.billMonth))
+    .map((b) => {
+      const avoidedKwh = Math.max(0, current - kwhPerDay(b)) * periodDays(b);
+      const rate = marginalRate(b.kwh, settings.tariff, site.premisesType, b.fuelSurchargeRate);
+      return { billMonth: b.billMonth, aed: round2(avoidedKwh * rate) };
+    });
 }
