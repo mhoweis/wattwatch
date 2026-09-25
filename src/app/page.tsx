@@ -69,6 +69,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
   for (const f of doneConsumption) {
     const site = store.sites.find((s) => s.id === f.siteId);
     if (!site) continue;
+    savingsByMonth.set(f.billMonth, savingsByMonth.get(f.billMonth) ?? 0);
     for (const point of realisedByMonth(f, site, store.bills, store.settings)) savingsByMonth.set(point.billMonth, (savingsByMonth.get(point.billMonth) ?? 0) + point.aed);
   }
   const savingsHistory = [...savingsByMonth.entries()].sort(([a], [b]) => a.localeCompare(b)).reduce<{ billMonth: string; value: number }[]>((history, [billMonth, value]) => {
@@ -146,7 +147,9 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
                 {plan.map((row) => (
                   <tr key={row.findingId} className="border-t border-slate-100">
                     <td className="py-2 pr-3">
-                      <Link href={`/findings/${encodeURIComponent(row.findingId)}`} className="font-medium text-amber-700 hover:underline">{row.action}</Link>
+                      <Link href={`/findings/${encodeURIComponent(row.findingId)}`} className="font-medium text-amber-700 hover:underline">
+                        {row.action}{row.relatedCount > 0 && ` · +${row.relatedCount} related`}
+                      </Link>
                     </td>
                     <td className="pr-3">{row.siteName}</td>
                     <td className="pr-3 text-right font-mono">{fmtAed(row.monthlyAed)}</td>
@@ -165,7 +168,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
               <li key={row.findingId}>
                 <Link href={`/findings/${encodeURIComponent(row.findingId)}`} className="block rounded-lg border border-slate-200 p-3 active:bg-amber-50">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="font-medium">{row.action}</div>
+                    <div className="font-medium">{row.action}{row.relatedCount > 0 && ` · +${row.relatedCount} related`}</div>
                     <StatusPill status={row.status} />
                   </div>
                   <div className="mt-1 text-sm text-slate-600">{row.siteName}</div>
@@ -180,6 +183,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
               </li>
             ))}
           </ul>
+          <p className="mt-3 text-xs text-slate-500">One row per site at its latest run-rate; refunds are one-off.</p>
           <div className="mt-3 border-t border-slate-100 pt-3 text-sm font-medium">Total annual opportunity: {fmtAed(plan.reduce((sum, row) => sum + row.annualAed, 0))}</div>
         </Card>
       )}

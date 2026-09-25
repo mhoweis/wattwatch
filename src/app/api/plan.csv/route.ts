@@ -11,12 +11,13 @@ function csvField(value: string | number | undefined): string {
 export async function GET() {
   const store = readStore();
   const rows = actionPlan(store.sites, analyse(store.sites, store.bills, store.settings), store.actions);
-  const headers = ["Finding ID", "Site", "Action", "Kind", "AED/month", "AED/year", "Capex", "Payback months", "Owner", "Status", "Due date"];
+  const headers = ["Finding ID", "Related count", "Site", "Action", "Kind", "AED/month", "AED/year", "Capex", "Payback months", "Owner", "Status", "Due date"];
   const lines = [
     headers.join(","),
     ...rows.map((row) =>
       [
         row.findingId,
+        row.relatedCount,
         row.siteName,
         row.action,
         row.kind,

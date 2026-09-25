@@ -230,6 +230,21 @@ describe("weather adjustment and verified savings", () => {
     expect(actionPlan([site], [spike], { [spike.id]: { findingId: spike.id, status: "done", updatedAt: "" } })).toEqual([]);
   });
 
+  it("collapses multiple open consumption findings at one site to the latest run-rate", () => {
+    const baseFinding = analyse([site], [mk("2026-04", 5000), mk("2026-05", 5000), mk("2026-06", 6500)], settings).find((f) => f.type === "SPIKE_VS_BASELINE")!;
+    const earlier = { ...baseFinding, id: "SPIKE_VS_BASELINE:s:2026-06", billMonth: "2026-06", excessAed: 100 };
+    const latest = { ...baseFinding, id: "SLAB_BAND_JUMP:s:2026-07", type: "SLAB_BAND_JUMP" as const, billMonth: "2026-07", excessAed: 240 };
+    const rows = actionPlan([site], [earlier, latest], {});
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      findingId: latest.id,
+      action: "Stay under the tariff band boundary",
+      monthlyAed: 240,
+      relatedFindingIds: [earlier.id],
+      relatedCount: 1,
+    });
+  });
+
   it("returns non-negative realised saving for every later bill", () => {
     const bills = [mk("2026-04", 5000), mk("2026-05", 5000), mk("2026-06", 5000), mk("2026-07", 6500), mk("2026-08", 5200), mk("2026-09", 7000)];
     const spike = analyse([site], bills, settings).find((f) => f.type === "SPIKE_VS_BASELINE" && f.billMonth === "2026-07")!;

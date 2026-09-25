@@ -545,6 +545,8 @@ export function costOfInaction(f: Finding, site: Site, bills: Bill[], settings: 
 
 export interface PlanRow {
   findingId: string;
+  relatedFindingIds: string[];
+  relatedCount: number;
   siteId: string;
   siteName: string;
   action: string;
@@ -568,34 +570,46 @@ const actionText: Partial<Record<Finding["type"], string>> = {
 export function actionPlan(sites: Site[], findings: Finding[], actions: Record<string, ActionRecord>): PlanRow[] {
   const siteById = new Map(sites.map((s) => [s.id, s]));
   const rows: PlanRow[] = [];
-  for (const f of findings) {
-    const record = actions[f.id];
-    const status = record?.status ?? "open";
-    if (status === "done") continue;
-    const site = siteById.get(f.siteId);
-    if (!site) continue;
-    if (consumptionTypes.has(f.type) && f.excessAed > 0) {
-      const monthlyAed = round2(f.excessAed);
+  for (const site of sites) {
+    const consumption = findings
+      .filter((f) => f.siteId === site.id && consumptionTypes.has(f.type) && f.excessAed > 0 && actions[f.id]?.status !== "done")
+      .sort((a, b) => b.billMonth.localeCompare(a.billMonth) || b.excessAed - a.excessAed);
+    const chosen = consumption[0];
+    if (chosen) {
+      const record = actions[chosen.id];
+      const relatedFindingIds = consumption.slice(1).map((f) => f.id);
+      const monthlyAed = round2(chosen.excessAed);
       const capexAed = record?.capexAed ?? 0;
       rows.push({
-        findingId: f.id,
-        siteId: f.siteId,
+        findingId: chosen.id,
+        relatedFindingIds,
+        relatedCount: relatedFindingIds.length,
+        siteId: site.id,
         siteName: site.name,
-        action: actionText[f.type] ?? f.headline,
+        action: actionText[chosen.type] ?? chosen.headline,
         kind: "efficiency",
         monthlyAed,
         annualAed: round2(monthlyAed * 12),
         capexAed,
         paybackMonths: capexAed > 0 && monthlyAed > 0 ? round2(capexAed / monthlyAed) : capexAed === 0 ? 0 : null,
         owner: record?.owner,
-        status,
+        status: record?.status ?? "open",
         dueDate: record?.dueDate,
       });
-    } else if (f.type === "TOTAL_MISMATCH" && (f.metrics.recoverableAed ?? 0) > 0) {
+    }
+  }
+  for (const f of findings) {
+    const record = actions[f.id];
+    const status = record?.status ?? "open";
+    const site = siteById.get(f.siteId);
+    if (!site || status === "done") continue;
+    if (f.type === "TOTAL_MISMATCH" && (f.metrics.recoverableAed ?? 0) > 0) {
       const annualAed = round2(f.metrics.recoverableAed);
       const capexAed = record?.capexAed ?? 0;
       rows.push({
         findingId: f.id,
+        relatedFindingIds: [],
+        relatedCount: 0,
         siteId: f.siteId,
         siteName: site.name,
         action: "Dispute with DEWA billing",
