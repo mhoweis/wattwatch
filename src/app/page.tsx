@@ -13,16 +13,16 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
   const store = readStore();
   if (store.bills.length === 0) {
     return (
-      <div className="mx-auto max-w-xl space-y-6 pt-12">
+      <div className="mx-auto max-w-xl space-y-6 pt-6 sm:pt-12">
         <Empty title="No bills yet">
           Upload DEWA electricity bills (PDF or CSV) for your branches, or load the prepared sample dataset — three branches, six months.
         </Empty>
-        <div className="flex justify-center gap-3">
-          <Link href="/upload" className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white">
+        <div className="flex flex-col justify-center gap-3 sm:flex-row">
+          <Link href="/upload" className="rounded-md bg-slate-900 px-4 py-3 text-center text-sm font-medium text-white sm:py-2">
             Upload bills
           </Link>
           <form action={loadSampleAction}>
-            <button className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium">Load sample dataset</button>
+            <button className="w-full rounded-md border border-slate-300 bg-white px-4 py-3 text-sm font-medium sm:py-2">Load sample dataset</button>
           </form>
         </div>
       </div>
@@ -44,19 +44,19 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Portfolio</h1>
+      <div className="flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold sm:text-2xl">Portfolio</h1>
           <p className="text-sm text-slate-600">
             {store.sites.length} sites · {usable.length} bills · {monthLabel(months[0])} – {monthLabel(months[months.length - 1])}
           </p>
         </div>
-        <Link href="/upload" className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white">
+        <Link href="/upload" className="shrink-0 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white sm:py-1.5">
           Add bills
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
         <Stat label="Total spend" value={fmtAed(totalAed)} sub={`${totalKwh.toLocaleString()} kWh`} />
         <Stat
           label="Excess flagged"
@@ -75,8 +75,9 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
         <Card className="lg:col-span-2">
           <div className="mb-2 text-sm font-medium">Consumption per day by site</div>
           <TrendChart
+            height={220}
             series={summaries.map((s, i) => ({
-              name: s.site.name.split(" — ")[0],
+              name: s.site.name.split(/ [—-] /)[0],
               color: PALETTE[i % PALETTE.length],
               points: s.months.map((m) => ({ billMonth: m.billMonth, value: m.kwhPerDay })),
             }))}
@@ -84,12 +85,12 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
         </Card>
         <div className="space-y-3">
           {summaries.map((s) => (
-            <Link key={s.site.id} href={`/?site=${s.site.id}`} className={`block rounded-lg border bg-white p-3 hover:border-amber-400 ${filterSite === s.site.id ? "border-amber-400" : "border-slate-200"}`}>
-              <div className="flex items-center justify-between">
-                <div className="font-medium">{s.site.name}</div>
+            <Link key={s.site.id} href={`/?site=${s.site.id}`} className={`block rounded-lg border bg-white p-3 active:bg-amber-50 hover:border-amber-400 ${filterSite === s.site.id ? "border-amber-400" : "border-slate-200"}`}>
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 truncate font-medium">{s.site.name}</div>
                 {s.topSeverity && <SeverityBadge s={s.topSeverity} />}
               </div>
-              <div className="mt-1 flex justify-between text-sm text-slate-600">
+              <div className="mt-1 flex flex-wrap justify-between gap-x-3 text-sm text-slate-600">
                 <span>{s.lastKwh.toLocaleString()} kWh last month</span>
                 <span className={s.deltaPct !== null && s.deltaPct >= 20 ? "font-medium text-red-700" : ""}>
                   {s.deltaPct !== null ? `${s.deltaPct > 0 ? "+" : ""}${s.deltaPct.toFixed(0)}% vs baseline` : "no baseline"}
@@ -105,14 +106,14 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
       </div>
 
       <div>
-        <div className="mb-3 flex items-center gap-3">
+        <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
           <h2 className="text-lg font-semibold">Investigate first</h2>
-          <div className="flex gap-2 text-xs">
+          <div className="flex flex-wrap gap-2 text-xs">
             {[undefined, "high", "medium", "data-quality"].map((s) => (
               <Link
                 key={s ?? "all"}
                 href={`/?${new URLSearchParams({ ...(filterSite ? { site: filterSite } : {}), ...(s ? { severity: s } : {}) })}`}
-                className={`rounded-full border px-2 py-0.5 ${filterSev === s ? "border-slate-900 bg-slate-900 text-white" : "border-slate-300 bg-white"}`}
+                className={`rounded-full border px-3 py-1 ${filterSev === s ? "border-slate-900 bg-slate-900 text-white" : "border-slate-300 bg-white"}`}
               >
                 {s ?? "all"}
               </Link>

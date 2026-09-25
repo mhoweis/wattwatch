@@ -35,21 +35,24 @@ export default async function FindingPage({ params }: PageProps<"/findings/[id]"
         </Link>{" "}
         / {typeLabel[f.type]}
       </div>
-      <div className="flex items-start gap-3">
-        <SeverityBadge s={f.severity} />
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">{f.headline}</h1>
-          <p className="mt-1 text-slate-600">{f.whyHint}</p>
+          <SeverityBadge s={f.severity} />
+        </div>
+        <div>
+          <h1 className="text-xl font-semibold sm:text-2xl">{f.headline}</h1>
+          <p className="mt-1 text-sm text-slate-600 sm:text-base">{f.whyHint}</p>
         </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <div className="mb-2 flex items-baseline justify-between">
+          <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3">
             <div className="text-sm font-medium">{site.name} — kWh per day</div>
             {baselinePerDay !== undefined && <div className="text-xs text-slate-500">Baseline (median of prior months): {baselinePerDay} kWh/day</div>}
           </div>
           <TrendChart
+            height={220}
             series={[
               { name: "kWh/day", color: "#f59e0b", points: siteBills.map((b) => ({ billMonth: b.billMonth, value: round2(kwhPerDay(b)) })) },
               ...(baselinePerDay !== undefined ? [{ name: "baseline", color: "#94a3b8", points: siteBills.map((b) => ({ billMonth: b.billMonth, value: baselinePerDay })) }] : []),
@@ -99,12 +102,12 @@ export default async function FindingPage({ params }: PageProps<"/findings/[id]"
           <thead className="text-left text-xs uppercase text-slate-500">
             <tr>
               <th className="py-1">Month</th>
-              <th>Period</th>
+              <th className="hidden md:table-cell">Period</th>
               <th className="text-right">kWh</th>
               <th className="text-right">kWh/day</th>
-              <th className="text-right">Surcharge</th>
+              <th className="hidden text-right sm:table-cell">Surcharge</th>
               <th className="text-right">Total</th>
-              <th>Source</th>
+              <th className="hidden md:table-cell">Source</th>
             </tr>
           </thead>
           <tbody>
@@ -114,16 +117,16 @@ export default async function FindingPage({ params }: PageProps<"/findings/[id]"
                   <Link href={`/bills/${b.id}`} className="text-amber-700 underline">
                     {monthLabel(b.billMonth)}
                   </Link>
-                  {b.status === "duplicate" && <span className="ml-2 text-xs text-sky-700">duplicate</span>}
+                  {b.status === "duplicate" && <span className="ml-1 text-xs text-sky-700 sm:ml-2">dup</span>}
                 </td>
-                <td className="text-slate-600">
+                <td className="hidden text-slate-600 md:table-cell">
                   {b.periodStart} → {b.periodEnd} ({periodDays(b)} d)
                 </td>
                 <td className="text-right font-mono">{b.kwh.toLocaleString()}</td>
                 <td className="text-right font-mono">{round2(kwhPerDay(b))}</td>
-                <td className="text-right font-mono">{b.fuelSurchargeRate.toFixed(3)}</td>
+                <td className="hidden text-right font-mono sm:table-cell">{b.fuelSurchargeRate.toFixed(3)}</td>
                 <td className="text-right font-mono">{fmtAed(b.totalAed)}</td>
-                <td className="text-xs text-slate-500">
+                <td className="hidden text-xs text-slate-500 md:table-cell">
                   {b.extractionMethod} · {(b.extractionConfidence * 100).toFixed(0)}%
                 </td>
               </tr>

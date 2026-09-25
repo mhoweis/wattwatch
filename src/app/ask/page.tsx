@@ -29,7 +29,7 @@ export default function AskPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Ask your bills</h1>
+        <h1 className="text-xl font-semibold sm:text-2xl">Ask your bills</h1>
         <p className="text-sm text-slate-600">Every answer cites the bills and findings it relies on. Numbers come from the structured data, never from the model&apos;s memory.</p>
       </div>
       <form
@@ -39,14 +39,21 @@ export default function AskPage() {
         }}
         className="flex gap-2"
       >
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Which branch cost the most in July and why?" className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm" />
-        <button disabled={pending} className="rounded-md bg-amber-500 px-4 py-2 text-sm font-medium text-slate-900 disabled:opacity-50">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Which branch cost the most in July?"
+          enterKeyHint="send"
+          autoComplete="off"
+          className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2.5 text-base sm:py-2 sm:text-sm"
+        />
+        <button disabled={pending} className="shrink-0 rounded-md bg-amber-500 px-4 py-2.5 text-sm font-medium text-slate-900 disabled:opacity-50 sm:py-2">
           {pending ? "Thinking…" : "Ask"}
         </button>
       </form>
       <div className="flex flex-wrap gap-2">
         {suggestions.map((s) => (
-          <button key={s} type="button" onClick={() => submit(s)} className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs hover:border-amber-400">
+          <button key={s} type="button" onClick={() => submit(s)} className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs active:bg-amber-50 hover:border-amber-400">
             {s}
           </button>
         ))}
@@ -55,7 +62,7 @@ export default function AskPage() {
         {history.map((h, i) => (
           <div key={i} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <div className="text-sm font-medium text-slate-500">{h.q}</div>
-            <p className="mt-2 whitespace-pre-line">{h.a.text}</p>
+            <p className="mt-2 whitespace-pre-line text-sm sm:text-base">{h.a.text}</p>
             {(h.a.citations.length > 0 || h.a.findingIds.length > 0) && (
               <div className="mt-3 flex flex-wrap gap-2 text-xs">
                 {h.a.citations.map((c) => (

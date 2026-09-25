@@ -30,7 +30,7 @@ export function ScenarioSlider({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-baseline justify-between">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <label htmlFor="reduction" className="text-sm font-medium">
           Proposed monthly reduction
         </label>
@@ -48,14 +48,26 @@ export function ScenarioSlider({
         onChange={(e) => setReduction(Number(e.target.value))}
         className="w-full accent-amber-500"
       />
+      <div className="flex gap-2 sm:hidden">
+        {[-100, -10, 10, 100].map((d) => (
+          <button
+            key={d}
+            type="button"
+            onClick={() => setReduction((v) => Math.max(0, Math.min(Math.round(kwh * 0.5), v + d)))}
+            className="flex-1 rounded-md border border-slate-300 bg-white py-2 text-sm font-medium active:bg-amber-50"
+          >
+            {d > 0 ? `+${d}` : d}
+          </button>
+        ))}
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-md bg-emerald-50 p-3">
           <div className="text-xs uppercase tracking-wide text-emerald-700">Monthly saving (scenario)</div>
-          <div className="text-2xl font-semibold text-emerald-800">{fmtAed(r.monthlySaving)}</div>
+          <div className="text-xl font-semibold text-emerald-800 sm:text-2xl">{fmtAed(r.monthlySaving)}</div>
         </div>
         <div className="rounded-md bg-emerald-50 p-3">
           <div className="text-xs uppercase tracking-wide text-emerald-700">Annualised (× 12)</div>
-          <div className="text-2xl font-semibold text-emerald-800">{fmtAed(r.annualSaving)}</div>
+          <div className="text-xl font-semibold text-emerald-800 sm:text-2xl">{fmtAed(r.annualSaving)}</div>
         </div>
       </div>
       {co2 !== null && (
@@ -67,7 +79,7 @@ export function ScenarioSlider({
         Scenario, not a guaranteed saving. Uses the DEWA {premises} slab tariff with the fuel surcharge printed on this bill ({surchargeRate.toFixed(3)} AED/kWh) and 5% VAT.
         {crossesSlab && " The reduction crosses a slab boundary, so part of it is valued at the lower slab rate."}
       </p>
-      <button type="button" onClick={() => setShowTrace((v) => !v)} className="text-sm text-amber-700 underline">
+      <button type="button" onClick={() => setShowTrace((v) => !v)} className="py-1 text-sm text-amber-700 underline">
         {showTrace ? "Hide" : "Show"} calculation
       </button>
       {showTrace && (
@@ -75,8 +87,11 @@ export function ScenarioSlider({
           <tbody>
             {r.trace.map((l) => (
               <tr key={l.label} className="border-t border-slate-100">
-                <td className="py-1 pr-2">{l.label}</td>
-                <td className="py-1 pr-2 font-mono text-xs text-slate-500">{l.formula}</td>
+                <td className="py-1 pr-2">
+                  {l.label}
+                  <div className="font-mono text-[11px] text-slate-500 sm:hidden">{l.formula}</div>
+                </td>
+                <td className="hidden py-1 pr-2 font-mono text-xs text-slate-500 sm:table-cell">{l.formula}</td>
                 <td className="py-1 text-right font-mono">
                   {l.unit === "AED" ? fmtAed(l.value) : `${l.value.toLocaleString()} ${l.unit}`}
                 </td>

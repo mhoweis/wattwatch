@@ -9,6 +9,32 @@ body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 16px inputs stop iOS Safari from zooming on focus */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea,
+  button {
+    font-size: max(16px, 1em);
+  }
+}
+input,
+select,
+textarea,
+button,
+a {
+  touch-action: manipulation;
+}
+
+input[type="range"] {
+  height: 2.75rem;
+}
+
 [dir="rtl"] {
   font-family: "Noto Naskh Arabic", "Segoe UI", Tahoma, Arial, sans-serif;
 }

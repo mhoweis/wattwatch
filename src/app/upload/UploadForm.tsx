@@ -22,12 +22,12 @@ export function UploadForm() {
         });
       }}
     >
-      <label className="block rounded-lg border-2 border-dashed border-slate-300 p-8 text-center hover:border-amber-400">
-        <input type="file" name="files" multiple accept=".pdf,.csv,application/pdf,text/csv" className="block w-full text-sm" required />
+      <label className="block rounded-lg border-2 border-dashed border-slate-300 p-4 text-center hover:border-amber-400 sm:p-8">
+        <input type="file" name="files" multiple accept=".pdf,.csv,application/pdf,text/csv" className="block w-full max-w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white" required />
         <div className="mt-2 text-sm text-slate-600">DEWA electricity bill PDFs (text layer required) or a CSV export. Several files at once are fine.</div>
       </label>
-      <div className="flex items-center gap-3">
-        <button disabled={pending} className="rounded-md bg-amber-500 px-4 py-2 text-sm font-medium text-slate-900 disabled:opacity-50">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <button disabled={pending} className="rounded-md bg-amber-500 px-4 py-3 text-sm font-medium text-slate-900 disabled:opacity-50 sm:py-2">
           {pending ? "Reading bills…" : "Upload & extract"}
         </button>
         <span className="text-xs text-slate-500">PDFs: deterministic DEWA-layout parser first, then AI extraction (if configured). Every bill is recomputed from the tariff and reconciled with its printed total.</span>

@@ -10,7 +10,7 @@ export default function UploadPage() {
   const store = readStore();
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Upload bills</h1>
+      <h1 className="text-xl font-semibold sm:text-2xl">Upload bills</h1>
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <UploadForm />

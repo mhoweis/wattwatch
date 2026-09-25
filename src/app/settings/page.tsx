@@ -16,7 +16,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <h1 className="text-2xl font-semibold">Settings</h1>
+        <h1 className="text-xl font-semibold sm:text-2xl">Settings</h1>
         {sp.saved && <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">Saved</span>}
       </div>
 

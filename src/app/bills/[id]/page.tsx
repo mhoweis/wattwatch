@@ -28,21 +28,21 @@ export default async function BillPage({ params }: PageProps<"/bills/[id]">) {
         </Link>{" "}
         / {site.name} / {monthLabel(b.billMonth)}
       </div>
-      <h1 className="text-2xl font-semibold">
+      <h1 className="text-xl font-semibold sm:text-2xl">
         {site.name} — {monthLabel(b.billMonth)}
       </h1>
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <div className="mb-2 text-sm font-medium">As read from the bill</div>
-          <dl className="grid grid-cols-2 gap-y-1 text-sm">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
             <dt className="text-slate-500">Account</dt>
             <dd className="font-mono">{b.accountNo}</dd>
             <dt className="text-slate-500">Period</dt>
-            <dd>
+            <dd className="break-words">
               {b.periodStart} → {b.periodEnd} ({periodDays(b)} days)
             </dd>
             <dt className="text-slate-500">Consumption</dt>
-            <dd className="font-mono">
+            <dd className="font-mono text-xs sm:text-sm">
               {b.kwh.toLocaleString()} kWh ({round2(kwhPerDay(b))} kWh/day)
             </dd>
             <dt className="text-slate-500">Fuel surcharge rate</dt>

@@ -12,7 +12,7 @@ export function Stat({ label, value, sub }: { label: string; value: ReactNode; s
   return (
     <Card>
       <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
-      <div className="mt-1 text-2xl font-semibold">{value}</div>
+      <div className="mt-1 text-xl font-semibold sm:text-2xl">{value}</div>
       {sub && <div className="mt-1 text-xs text-slate-500">{sub}</div>}
     </Card>
   );
@@ -45,20 +45,31 @@ export function findingHref(f: Finding) {
 
 export function FindingRow({ f }: { f: Finding }) {
   return (
-    <Link href={findingHref(f)} className="block rounded-lg border border-slate-200 bg-white p-4 hover:border-amber-400 hover:shadow-sm">
-      <div className="flex items-start gap-3">
+    <Link href={findingHref(f)} className="block rounded-lg border border-slate-200 bg-white p-4 active:bg-amber-50 hover:border-amber-400 hover:shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2 sm:hidden">
         <SeverityBadge s={f.severity} />
-        <div className="flex-1">
+        {f.excessAed > 0 && (
+          <div className="text-right leading-tight">
+            <span className="font-semibold">{fmtAed(f.excessAed)}</span>{" "}
+            <span className="text-xs text-slate-500">{f.type === "TOTAL_MISMATCH" ? "discrepancy" : "est. excess / mo"}</span>
+          </div>
+        )}
+      </div>
+      <div className="mt-2 flex items-start gap-3 sm:mt-0">
+        <span className="hidden sm:inline-block">
+          <SeverityBadge s={f.severity} />
+        </span>
+        <div className="min-w-0 flex-1">
           <div className="font-medium">{f.headline}</div>
           <div className="mt-1 text-sm text-slate-600">{f.whyHint}</div>
-          <div className="mt-2 flex gap-4 text-xs text-slate-500">
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
             <span>{typeLabel[f.type]}</span>
             <span>{monthLabel(f.billMonth)}</span>
             <span>{f.evidenceBillIds.length} evidence bill{f.evidenceBillIds.length === 1 ? "" : "s"}</span>
           </div>
         </div>
         {f.excessAed > 0 && (
-          <div className="text-right">
+          <div className="hidden text-right sm:block">
             <div className="text-lg font-semibold">{fmtAed(f.excessAed)}</div>
             <div className="text-xs text-slate-500">{f.type === "TOTAL_MISMATCH" ? "discrepancy" : "est. excess / month"}</div>
           </div>

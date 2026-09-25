@@ -23,15 +23,15 @@ export function ExplainPanel({ findingId, initial }: { findingId: string; initia
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="mb-3 flex items-center gap-3">
+      <div className="mb-3 flex flex-wrap items-center gap-3">
         <div className="text-sm font-medium">Explanation & action sheet</div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
           {e && (
             <div className="flex rounded-md border border-slate-300 text-xs">
-              <button type="button" onClick={() => setLang("en")} className={`px-2 py-1 ${lang === "en" ? "bg-slate-900 text-white" : ""}`}>
+              <button type="button" onClick={() => setLang("en")} className={`px-3 py-1.5 ${lang === "en" ? "bg-slate-900 text-white" : ""}`}>
                 English
               </button>
-              <button type="button" onClick={() => setLang("ar")} className={`px-2 py-1 ${lang === "ar" ? "bg-slate-900 text-white" : ""}`}>
+              <button type="button" onClick={() => setLang("ar")} className={`px-3 py-1.5 ${lang === "ar" ? "bg-slate-900 text-white" : ""}`}>
                 العربية
               </button>
             </div>
@@ -40,7 +40,7 @@ export function ExplainPanel({ findingId, initial }: { findingId: string; initia
             type="button"
             disabled={pending}
             onClick={() => run(Boolean(e))}
-            className="rounded-md bg-amber-500 px-3 py-1.5 text-sm font-medium text-slate-900 disabled:opacity-50"
+            className="ml-auto rounded-md bg-amber-500 px-3 py-2 text-sm font-medium text-slate-900 disabled:opacity-50 sm:ml-0 sm:py-1.5"
           >
             {pending ? "Generating…" : e ? "Regenerate" : "Generate explanation & actions"}
           </button>

@@ -20,12 +20,12 @@ export function TrendChart({ series, unit = "kWh/day", height = 260 }: { series:
   });
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+      <LineChart data={data} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
         <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
-        <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-        <YAxis tick={{ fontSize: 12 }} width={56} />
+        <XAxis dataKey="month" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
+        <YAxis tick={{ fontSize: 11 }} width={48} />
         <Tooltip formatter={(v) => `${v} ${unit}`} />
-        {series.length > 1 && <Legend />}
+        {series.length > 1 && <Legend wrapperStyle={{ fontSize: 12 }} />}
         {series.map((s, i) => (
           <Line key={s.name} type="monotone" dataKey={s.name} stroke={s.color || PALETTE[i % PALETTE.length]} strokeWidth={2} dot connectNulls={false} />
         ))}
