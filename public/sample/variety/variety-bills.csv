@@ -1,0 +1,19 @@
+site,account_no,period_start,period_end,kwh,fuel_surcharge_rate,meter_charge,total_aed,premises_type
+Warehouse D - Jebel Ali,2001234504,2026-03-14,2026-04-13,14200,0.06,35,5022.15,industrial
+Warehouse D - Jebel Ali,2001234504,2026-04-14,2026-05-13,14650,0.06,35,5230.05,industrial
+Warehouse D - Jebel Ali,2001234504,2026-05-14,2026-06-13,14900,0.065,35,5423.78,industrial
+Warehouse D - Jebel Ali,2001234504,2026-06-14,2026-07-13,15100,0.065,35,5517.23,industrial
+Warehouse D - Jebel Ali,2001234504,2026-07-14,2026-08-13,15300,0.065,35,6534.68,industrial
+Warehouse D - Jebel Ali,2001234504,2026-08-14,2026-09-13,15050,0.065,35,5493.86,industrial
+Office E - Business Bay,2001234505,2026-03-01,2026-03-31,3100,0.06,35,1038.45,commercial
+Office E - Business Bay,2001234505,2026-04-01,2026-04-30,3300,0.06,35,1109.85,commercial
+Office E - Business Bay,2001234505,2026-05-01,2026-05-31,3760,0.06,35,1274.07,commercial
+Office E - Business Bay,2001234505,2026-06-01,2026-06-30,4020,0.06,35,1367.73,commercial
+Office E - Business Bay,2001234505,2026-07-01,2026-07-31,4580,0.06,35,1591.17,commercial
+Office E - Business Bay,2001234505,2026-08-01,2026-08-31,5060,0.06,35,1782.69,commercial
+Kiosk F - Dubai Marina,2001234506,2026-03-01,2026-03-31,610,0.06,35,222.5,commercial
+Kiosk F - Dubai Marina,2001234506,2026-04-01,2026-04-30,640,0.06,35,231.63,commercial
+Kiosk F - Dubai Marina,2001234506,2026-05-01,2026-05-31,655,0.06,35,236.2,commercial
+Kiosk F - Dubai Marina,2001234506,2026-06-01,2026-06-30,670,0.06,35,240.77,commercial
+Kiosk F - Dubai Marina,2001234506,2026-07-01,2026-07-31,690,0.06,35,246.86,commercial
+Kiosk F - Dubai Marina,2001234506,2026-08-01,2026-08-31,685,0.06,35,245.33,commercial

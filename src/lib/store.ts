@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { Bill, Explanation, Settings, Site, SourceFile, Store } from "./types";
+import type { Bill, Explanation, PremisesType, Settings, Site, SourceFile, Store } from "./types";
 import { DEFAULT_TARIFF } from "./tariff";
 import { DEFAULT_THRESHOLDS } from "./analysis";
 import { buildSampleBills, SAMPLE_SITES } from "./sample";
@@ -68,14 +68,14 @@ export function resetStore(): void {
   writeStore(emptyStore());
 }
 
-export function upsertSiteByAccount(store: Store, accountNo: string, name: string): Site {
+export function upsertSiteByAccount(store: Store, accountNo: string, name: string, premisesType: PremisesType = "commercial"): Site {
   let site = store.sites.find((s) => s.dewaAccountNo === accountNo);
   if (!site) {
     site = {
       id: `site-${store.sites.length + 1}-${accountNo.slice(-4)}`,
       name,
       dewaAccountNo: accountNo,
-      premisesType: "commercial",
+      premisesType,
       hasOwnCooling: true,
     };
     store.sites.push(site);

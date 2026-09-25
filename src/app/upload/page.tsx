@@ -34,6 +34,26 @@ export default function UploadPage() {
             </div>
           </Card>
           <Card>
+            <div className="text-sm font-medium">Variety pack (upload test)</div>
+            <p className="mt-1 text-sm text-slate-600">
+              Three more sites of a different kind: an industrial warehouse on a 14th-to-13th billing cycle with a surcharge change and one bill wrongly charged at
+              commercial rates, an office with steady month-on-month drift, and a district-cooled kiosk with one scanned (image-only) bill.
+            </p>
+            <div className="mt-3 text-xs text-slate-500">
+              <a href="/sample/variety/index.json" className="underline" target="_blank" rel="noreferrer">
+                PDF list
+              </a>{" "}
+              · <a href="/sample/wattwatch-variety-samples.zip" className="underline" download>all as ZIP</a> ·{" "}
+              <a href="/sample/variety/variety-bills.csv" className="underline" download>
+                full CSV
+              </a>{" "}
+              ·{" "}
+              <a href="/sample/variety/scanned-bill-fallback.csv" className="underline" download>
+                CSV for the scanned bill
+              </a>
+            </div>
+          </Card>
+          <Card>
             <div className="text-sm font-medium">CSV format</div>
             <pre className="mt-2 overflow-x-auto rounded bg-slate-50 p-2 text-[11px] leading-relaxed">
               site,account_no,period_start,period_end,kwh,{"\n"}fuel_surcharge_rate,meter_charge,total_aed,premises_type

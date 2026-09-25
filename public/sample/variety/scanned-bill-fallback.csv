@@ -1,0 +1,2 @@
+site,account_no,period_start,period_end,kwh,fuel_surcharge_rate,meter_charge,total_aed,premises_type
+Kiosk F - Dubai Marina,2001234506,2026-05-01,2026-05-31,655,0.06,35,236.2,commercial

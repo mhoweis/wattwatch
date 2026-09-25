@@ -52,8 +52,8 @@ export async function uploadAction(formData: FormData): Promise<UploadResult> {
         addFile(s, { id: fileId, filename: file.name, type: "csv", uploadedAt: new Date().toISOString(), path: savedPath });
         for (const r of rows) {
           const premises: PremisesType = r.premises_type === "industrial" ? "industrial" : "commercial";
-          const site = upsertSiteByAccount(s, r.account_no, r.site);
-          const x = csvRowToExtraction(r, s.settings, premises);
+          const site = upsertSiteByAccount(s, r.account_no, r.site, premises);
+          const x = csvRowToExtraction(r, s.settings, site.premisesType);
           const bill = addBill(s, toBill(x, site.id, site.premisesType, s.settings, "csv", fileId));
           result.added.push({ filename: file.name, site: site.name, billMonth: bill.billMonth, kwh: bill.kwh, method: "csv", status: bill.status });
         }
@@ -68,9 +68,9 @@ export async function uploadAction(formData: FormData): Promise<UploadResult> {
     }
     update((s) => {
       addFile(s, { id: fileId, filename: file.name, type: "pdf", uploadedAt: new Date().toISOString(), path: savedPath });
-      const site = upsertSiteByAccount(s, ex.extraction.accountNo, ex.extraction.premisesName ?? `Account ${ex.extraction.accountNo}`);
-      const premises: PremisesType = ex.extraction.tariffCategory === "industrial" ? "industrial" : site.premisesType;
-      const bill = addBill(s, toBill(ex.extraction, site.id, premises, s.settings, ex.method, fileId));
+      const printedCategory: PremisesType = ex.extraction.tariffCategory === "industrial" ? "industrial" : "commercial";
+      const site = upsertSiteByAccount(s, ex.extraction.accountNo, ex.extraction.premisesName ?? `Account ${ex.extraction.accountNo}`, printedCategory);
+      const bill = addBill(s, toBill(ex.extraction, site.id, site.premisesType, s.settings, ex.method, fileId));
       result.added.push({ filename: file.name, site: site.name, billMonth: bill.billMonth, kwh: bill.kwh, method: ex.method, status: bill.status });
     });
   }

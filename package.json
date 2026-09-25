@@ -9,7 +9,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "sample:pdfs": "tsx scripts/generate-sample-pdfs.ts"
+    "sample:pdfs": "tsx scripts/generate-sample-pdfs.ts && tsx scripts/generate-variety-pdfs.ts"
   },
   "dependencies": {
     "next": "16.3.6",

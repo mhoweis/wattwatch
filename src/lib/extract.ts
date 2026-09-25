@@ -44,7 +44,7 @@ export function parseBillTextByRules(text: string): BillExtraction | null {
   const total = /Total Amount Due(?:\s*\(AED\))?[:\s]+([\d,]+\.\d{2})/i.exec(text);
   if (!acc || !period || !kwh || !total) return null;
   const surcharge = /Fuel Surcharge\s+[\d,]+\s*kWh\s*x\s*([\d.]+)/i.exec(text);
-  const meter = /Meter Service Charge[^\d]*([\d,]+\.\d{2})/i.exec(text);
+  const meter = /Meter Service Charge[^\n]*?([\d,]+\.\d{2})/i.exec(text);
   const vat = /VAT\s*5%\s+(?:[\d,]+\.\d{2}\s*x\s*0\.05\s+)?([\d,]+\.\d{2})/i.exec(text);
   const premises = /Premises[:\s]+(.+?)(?:\n|Tariff)/i.exec(text);
   const cat = /Tariff Category[:\s]+(\w+)/i.exec(text)?.[1]?.toLowerCase();
