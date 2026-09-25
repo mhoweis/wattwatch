@@ -27,7 +27,7 @@ export function TrendChart({ series, unit = "kWh/day", height = 260 }: { series:
         <Tooltip formatter={(v) => `${v} ${unit}`} />
         {series.length > 1 && <Legend wrapperStyle={{ fontSize: 12 }} />}
         {series.map((s, i) => (
-          <Line key={s.name} type="monotone" dataKey={s.name} stroke={s.color || PALETTE[i % PALETTE.length]} strokeWidth={2} dot connectNulls={false} />
+          <Line key={s.name} type="monotone" dataKey={s.name} stroke={s.color || PALETTE[i % PALETTE.length]} strokeWidth={2} dot connectNulls={false} isAnimationActive={false} />
         ))}
       </LineChart>
     </ResponsiveContainer>

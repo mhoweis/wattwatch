@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { analyse, monthLabel, summarise } from "@/lib/analysis";
+import { analyse, moneyAtStake, monthLabel, summarise } from "@/lib/analysis";
 import { readStore } from "@/lib/store";
 import { fmtAed } from "@/lib/tariff";
 import { Card, Empty, FindingRow, SeverityBadge, Stat } from "@/components/ui";
 import { PALETTE, TrendChart } from "@/components/TrendChart";
+import { StakeChart } from "@/components/charts";
 import { loadSampleAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +40,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
   const months = [...new Set(usable.map((b) => b.billMonth))].sort();
   const totalAed = usable.reduce((a, b) => a + b.totalAed, 0);
   const totalKwh = usable.reduce((a, b) => a + b.kwh, 0);
-  const excess = findings.filter((f) => f.severity !== "data-quality").reduce((a, f) => a + f.excessAed, 0);
+  const stake = moneyAtStake(store.sites, findings);
   const co2 = store.settings.emissionFactor.enabled ? (totalKwh * store.settings.emissionFactor.kgCo2ePerKwh) / 1000 : null;
 
   return (
@@ -58,18 +59,27 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
         <Stat label="Total spend" value={fmtAed(totalAed)} sub={`${totalKwh.toLocaleString()} kWh`} />
-        <Stat
-          label="Excess flagged"
-          value={fmtAed(excess)}
-          sub="est. above baseline / band, per flagged month"
-        />
-        <Stat label="Findings" value={findings.length} sub={`${findings.filter((f) => f.severity === "high").length} high · ${findings.filter((f) => f.severity === "data-quality").length} data quality`} />
+        <Stat label="Efficiency opportunity" value={fmtAed(stake.efficiencyMonthlyAed)} sub={`/month · ${fmtAed(stake.efficiencyAnnualAed)} annualised (scenario)`} />
+        <Stat label="Refund to claim" value={fmtAed(stake.recoverableAed)} sub={stake.recoverableAed > 0 ? "billing errors to dispute with DEWA" : "no billing errors found"} />
         <Stat
           label="Scope 2 (location-based)"
           value={co2 !== null ? `${co2.toFixed(1)} tCO₂e` : "—"}
           sub={co2 !== null ? `${store.settings.emissionFactor.kgCo2ePerKwh} kgCO₂e/kWh, DEWA ${store.settings.emissionFactor.year}` : "Enable an emission factor in Settings"}
         />
       </div>
+
+      {stake.bySite.length > 0 && (
+        <Card>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+            <div className="text-sm font-medium">Money at stake by site (AED)</div>
+            <div className="text-xs text-slate-500">
+              {findings.length} finding{findings.length === 1 ? "" : "s"} · {findings.filter((f) => f.severity === "high").length} high · {findings.filter((f) => f.severity === "data-quality").length} data quality
+            </div>
+          </div>
+          <p className="mb-1 text-xs text-slate-500">Excess consumption = cost above baseline/band across flagged months (largest finding per site-month). Billing errors = printed total above the correct tariff, claimable once.</p>
+          <StakeChart rows={stake.bySite} />
+        </Card>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">

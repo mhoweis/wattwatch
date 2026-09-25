@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { fmtAed, scenarioSaving } from "@/lib/tariff";
 import type { EmissionFactor, PremisesType, TariffConfig } from "@/lib/types";
+import { BillCompareChart } from "./charts";
+
+const parts = (b: { energy: number; surcharge: number; meterCharge: number; vat: number }) => ({ energy: b.energy, surcharge: b.surcharge, meter: b.meterCharge, vat: b.vat });
 
 export function ScenarioSlider({
   kwh,
@@ -70,6 +73,7 @@ export function ScenarioSlider({
           <div className="text-xl font-semibold text-emerald-800 sm:text-2xl">{fmtAed(r.annualSaving)}</div>
         </div>
       </div>
+      <BillCompareChart before={parts(r.before)} after={parts(r.after)} />
       {co2 !== null && (
         <div className="text-sm text-slate-600">
           ≈ <b>{co2.toFixed(0)} kgCO₂e/month</b> avoided (location-based Scope 2 estimate, {emissionFactor.kgCo2ePerKwh} kgCO₂e/kWh, {emissionFactor.year}).

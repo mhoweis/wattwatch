@@ -2,6 +2,7 @@ import type {
   Bill,
   CalcLine,
   Finding,
+  PremisesType,
   Settings,
   Site,
   Thresholds,
@@ -138,24 +139,36 @@ export function analyse(sites: Site[], allBills: Bill[], settings: Settings): Fi
       const printed = b.printedTotalAed ?? b.totalAed;
       const delta = round2(printed - recomputed);
       if (Math.abs(delta) > t.totalMismatchAed && b.status !== "duplicate") {
+        const otherType: PremisesType = site.premisesType === "industrial" ? "commercial" : "industrial";
+        const asOther = calcBill(b.kwh, settings.tariff, otherType, b.fuelSurchargeRate, b.meterCharge).total;
+        const wrongCategory = Math.abs(printed - asOther) <= t.totalMismatchAed;
+        const overcharged = wrongCategory && delta > 0;
+        const trace: CalcLine[] = [
+          { label: "Printed total", formula: "from bill", value: printed, unit: "AED" },
+          { label: `Recomputed as ${site.premisesType}`, formula: "calcBill(kWh, tariff, surcharge, meter)", value: recomputed, unit: "AED" },
+          { label: "Difference", formula: "printed − recomputed", value: delta, unit: "AED" },
+        ];
+        if (wrongCategory) trace.push({ label: `Recomputed as ${otherType}`, formula: "matches printed total", value: asOther, unit: "AED" });
         findings.push({
           id: `TOTAL_MISMATCH:${siteId}:${b.billMonth}:${b.id}`,
           siteId,
           type: "TOTAL_MISMATCH",
-          severity: "data-quality",
+          severity: overcharged ? "high" : "data-quality",
           billMonth: b.billMonth,
-          headline: `${site.name}: printed total differs from tariff recomputation by AED ${Math.abs(delta).toFixed(2)} (${monthLabel(b.billMonth)})`,
-          whyHint: "Either extraction misread a field or the bill was charged on a different tariff category. Verify against the PDF.",
-          metrics: { printed, recomputed, delta },
+          headline: wrongCategory
+            ? `${site.name}: ${monthLabel(b.billMonth)} bill was charged at ${otherType} rates instead of ${site.premisesType} — ${overcharged ? `AED ${delta.toFixed(2)} overcharged` : `AED ${Math.abs(delta).toFixed(2)} undercharged`}`
+            : `${site.name}: printed total differs from tariff recomputation by AED ${Math.abs(delta).toFixed(2)} (${monthLabel(b.billMonth)})`,
+          whyHint: overcharged
+            ? "The printed total matches the other tariff category exactly. Raise a billing dispute with DEWA citing the account's registered premises type; the difference is refundable."
+            : wrongCategory
+              ? "The printed total matches the other tariff category exactly. Confirm the premises type registered with DEWA (or correct it in Settings) — later bills may be re-rated."
+              : "Either extraction misread a field or a charge is missing from the tariff model. Verify against the PDF.",
+          metrics: { printed, recomputed, delta, ...(overcharged ? { recoverableAed: delta } : {}) },
           evidenceBillIds: [b.id],
-          calcTrace: [
-            { label: "Printed total", formula: "from bill", value: printed, unit: "AED" },
-            { label: "Recomputed total", formula: "calcBill(kWh, tariff, surcharge, meter)", value: recomputed, unit: "AED" },
-            { label: "Difference", formula: "printed − recomputed", value: delta, unit: "AED" },
-          ],
+          calcTrace: trace,
           excessKwh: 0,
           excessAed: Math.abs(delta),
-          score: 2 + Math.abs(delta),
+          score: (overcharged ? 3 : 1) * Math.abs(delta) + 2,
         });
       }
     }
@@ -170,7 +183,7 @@ export function analyse(sites: Site[], allBills: Bill[], settings: Settings): Fi
     for (let i = 0; i < bills.length; i++) {
       const b = bills[i];
       const prior = bills.slice(Math.max(0, i - t.baselineMonths), i);
-      if (prior.length >= 2) {
+      if (prior.length >= 2 && prior.every((p) => p.kwh > 0)) {
         const base = median(prior.map(kwhPerDay));
         const cur = kwhPerDay(b);
         const pct = ((cur - base) / base) * 100;
@@ -248,7 +261,7 @@ export function analyse(sites: Site[], allBills: Bill[], settings: Settings): Fi
 
       if (i >= 3) {
         const w = bills.slice(i - 3, i + 1).map(kwhPerDay);
-        const drift = w.every((v, k) => k === 0 || v >= w[k - 1] * (1 + t.driftPct / 100));
+        const drift = w[0] > 0 && w.every((v, k) => k === 0 || v >= w[k - 1] * (1 + t.driftPct / 100));
         if (drift) {
           const pct = ((w[3] - w[0]) / w[0]) * 100;
           const excessKwh = round2((w[3] - w[0]) * periodDays(b));
@@ -289,6 +302,7 @@ export function analyse(sites: Site[], allBills: Bill[], settings: Settings): Fi
       const peers = okBills.filter((b) => b.billMonth === m && b.siteId !== siteId && siteById.get(b.siteId)?.premisesType === site.premisesType);
       if (peers.length < 2) continue;
       const peerMed = median(peers.map(kwhPerDay));
+      if (peerMed <= 0) continue;
       const mineV = kwhPerDay(mine);
       peerTrace.push({ label: `${monthLabel(m)} site vs peer median`, formula: `${round2(mineV)} vs ${round2(peerMed)} kWh/day`, value: round2(((mineV - peerMed) / peerMed) * 100), unit: "%" });
       if (mineV >= peerMed * (1 + t.peerPct / 100)) {
@@ -317,6 +331,50 @@ export function analyse(sites: Site[], allBills: Bill[], settings: Settings): Fi
   }
 
   return findings.sort((a, b) => b.score - a.score);
+}
+
+export interface MoneyAtStake {
+  /** Recurring excess above baseline/band, counted once per site-month (largest finding wins). */
+  efficiencyMonthlyAed: number;
+  efficiencyAnnualAed: number;
+  /** One-off billing errors that can be disputed with DEWA. */
+  recoverableAed: number;
+  bySite: { siteId: string; name: string; efficiencyAed: number; recoverableAed: number }[];
+}
+
+export function moneyAtStake(sites: Site[], findings: Finding[]): MoneyAtStake {
+  const perSiteMonth = new Map<string, number>();
+  const recoverable = new Map<string, number>();
+  for (const f of findings) {
+    if (f.type === "TOTAL_MISMATCH") {
+      const r = f.metrics.recoverableAed ?? 0;
+      if (r > 0) recoverable.set(f.siteId, (recoverable.get(f.siteId) ?? 0) + r);
+      continue;
+    }
+    if (f.excessAed <= 0) continue;
+    const key = `${f.siteId}:${f.billMonth}`;
+    perSiteMonth.set(key, Math.max(perSiteMonth.get(key) ?? 0, f.excessAed));
+  }
+  const bySite = sites
+    .map((s) => {
+      let eff = 0;
+      for (const [k, v] of perSiteMonth) if (k.startsWith(`${s.id}:`)) eff += v;
+      return { siteId: s.id, name: s.name, efficiencyAed: round2(eff), recoverableAed: round2(recoverable.get(s.id) ?? 0) };
+    })
+    .filter((s) => s.efficiencyAed > 0 || s.recoverableAed > 0)
+    .sort((a, b) => b.efficiencyAed + b.recoverableAed - (a.efficiencyAed + a.recoverableAed));
+  // Latest flagged month per site approximates the recurring monthly excess
+  let monthly = 0;
+  for (const s of sites) {
+    const months = [...perSiteMonth.entries()].filter(([k]) => k.startsWith(`${s.id}:`)).sort(([a], [b]) => a.localeCompare(b));
+    if (months.length) monthly += months[months.length - 1][1];
+  }
+  return {
+    efficiencyMonthlyAed: round2(monthly),
+    efficiencyAnnualAed: round2(monthly * 12),
+    recoverableAed: round2([...recoverable.values()].reduce((a, b) => a + b, 0)),
+    bySite,
+  };
 }
 
 export interface SiteSummary {

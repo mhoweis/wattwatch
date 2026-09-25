@@ -4,6 +4,7 @@ import type { Bill, Explanation, PremisesType, Settings, Site, SourceFile, Store
 import { DEFAULT_TARIFF } from "./tariff";
 import { DEFAULT_THRESHOLDS } from "./analysis";
 import { buildSampleBills, SAMPLE_SITES } from "./sample";
+import { DEFAULT_CONTRACTORS } from "./contractors";
 
 export const DATA_DIR = process.env.WATTWATCH_DATA_DIR ?? path.join(process.cwd(), "data");
 const STORE_PATH = path.join(DATA_DIR, "store.json");
@@ -23,7 +24,7 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 function emptyStore(): Store {
-  return { sites: [], bills: [], files: [], settings: DEFAULT_SETTINGS, explanations: {} };
+  return { sites: [], bills: [], files: [], settings: DEFAULT_SETTINGS, explanations: {}, contractors: DEFAULT_CONTRACTORS };
 }
 
 export function sampleStore(): Store {
@@ -33,6 +34,7 @@ export function sampleStore(): Store {
     files: [],
     settings: DEFAULT_SETTINGS,
     explanations: {},
+    contractors: DEFAULT_CONTRACTORS,
   };
 }
 
@@ -40,7 +42,12 @@ export function readStore(): Store {
   try {
     const raw = fs.readFileSync(STORE_PATH, "utf8");
     const parsed = JSON.parse(raw) as Partial<Store>;
-    return { ...emptyStore(), ...parsed, settings: { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) } };
+    return {
+      ...emptyStore(),
+      ...parsed,
+      settings: { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) },
+      contractors: parsed.contractors ?? DEFAULT_CONTRACTORS,
+    };
   } catch {
     return emptyStore();
   }

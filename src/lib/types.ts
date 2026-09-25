@@ -128,6 +128,23 @@ export interface Settings {
   thresholds: Thresholds;
 }
 
+export type Specialty = "hvac" | "electrical" | "bms" | "energy-audit" | "lighting" | "refrigeration" | "billing";
+
+export interface Contractor {
+  id: string;
+  name: string;
+  nameAr?: string;
+  specialties: Specialty[];
+  areas: string[];
+  phone?: string;
+  whatsapp?: string;
+  email?: string;
+  url?: string;
+  note?: string;
+  /** Demo entries are illustrative and clearly labelled in the UI. */
+  demo?: boolean;
+}
+
 export interface Explanation {
   findingId: string;
   generatedAt: string;
@@ -155,4 +172,5 @@ export interface Store {
   files: SourceFile[];
   settings: Settings;
   explanations: Record<string, Explanation>;
+  contractors: Contractor[];
 }

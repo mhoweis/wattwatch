@@ -51,7 +51,7 @@ export function FindingRow({ f }: { f: Finding }) {
         {f.excessAed > 0 && (
           <div className="text-right leading-tight">
             <span className="font-semibold">{fmtAed(f.excessAed)}</span>{" "}
-            <span className="text-xs text-slate-500">{f.type === "TOTAL_MISMATCH" ? "discrepancy" : "est. excess / mo"}</span>
+            <span className="text-xs text-slate-500">{f.type === "TOTAL_MISMATCH" ? (f.metrics.recoverableAed ? "refundable" : "discrepancy") : "est. excess / mo"}</span>
           </div>
         )}
       </div>
@@ -71,7 +71,7 @@ export function FindingRow({ f }: { f: Finding }) {
         {f.excessAed > 0 && (
           <div className="hidden text-right sm:block">
             <div className="text-lg font-semibold">{fmtAed(f.excessAed)}</div>
-            <div className="text-xs text-slate-500">{f.type === "TOTAL_MISMATCH" ? "discrepancy" : "est. excess / month"}</div>
+            <div className="text-xs text-slate-500">{f.type === "TOTAL_MISMATCH" ? (f.metrics.recoverableAed ? "refundable" : "discrepancy") : "est. excess / month"}</div>
           </div>
         )}
       </div>

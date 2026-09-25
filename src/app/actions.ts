@@ -9,7 +9,8 @@ import { ask, type Answer } from "@/lib/ask";
 import { explainFinding } from "@/lib/explain";
 import { csvRowToExtraction, extractBill, parseCsv, toBill } from "@/lib/extract";
 import { addBill, addFile, loadSample, readStore, resetStore, saveExplanation, update, UPLOAD_DIR, upsertSiteByAccount } from "@/lib/store";
-import type { Bill, PremisesType, Settings } from "@/lib/types";
+import { SPECIALTY_LABEL } from "@/lib/contractors";
+import type { Bill, PremisesType, Settings, Specialty } from "@/lib/types";
 
 export async function loadSampleAction() {
   loadSample();
@@ -131,6 +132,41 @@ export async function saveSettingsAction(formData: FormData) {
   });
   revalidatePath("/", "layout");
   redirect("/settings?saved=1");
+}
+
+export async function addContractorAction(formData: FormData) {
+  const str = (k: string) => String(formData.get(k) ?? "").trim() || undefined;
+  const name = str("name");
+  if (!name) return;
+  const valid = new Set(Object.keys(SPECIALTY_LABEL));
+  const specialties = formData.getAll("specialties").map(String).filter((s): s is Specialty => valid.has(s));
+  if (specialties.length === 0) return;
+  const areas = (str("areas") ?? "*").split(",").map((a) => a.trim()).filter(Boolean);
+  update((s) => {
+    s.contractors.push({
+      id: `c-${Date.now().toString(36)}`,
+      name,
+      nameAr: str("nameAr"),
+      specialties,
+      areas: areas.length ? areas : ["*"],
+      phone: str("phone"),
+      whatsapp: str("whatsapp"),
+      email: str("email"),
+      url: str("url"),
+      note: str("note"),
+    });
+  });
+  revalidatePath("/", "layout");
+  redirect("/settings?saved=1#contractors");
+}
+
+export async function removeContractorAction(formData: FormData) {
+  const id = String(formData.get("id"));
+  update((s) => {
+    s.contractors = s.contractors.filter((c) => c.id !== id);
+  });
+  revalidatePath("/", "layout");
+  redirect("/settings?saved=1#contractors");
 }
 
 export async function updateSiteAction(formData: FormData) {
