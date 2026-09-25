@@ -8,6 +8,7 @@ import type {
   Thresholds,
 } from "./types";
 import { calcBill, marginalRate, round2 } from "./tariff";
+import { COOLING_SHARE, weatherExpectedPct } from "./weather";
 
 export const DEFAULT_THRESHOLDS: Thresholds = {
   spikePct: 20,
@@ -194,11 +195,33 @@ export function analyse(sites: Site[], allBills: Bill[], settings: Settings): Fi
           const excessAed = round2(excessKwh * rate);
           const sev = pct >= t.spikeHighPct ? "high" : "medium";
           const summer = ["05", "06", "07", "08", "09"].includes(b.billMonth.slice(5));
-          const whyHint = summer && site.hasOwnCooling
-            ? "Summer month at a site with its own cooling: check AC set-points, schedules and filter condition first, then after-hours equipment."
-            : summer
-              ? "Summer month: check tenant-side cooling/ventilation and any new equipment; compare with peer branches for the same month."
-              : "No seasonal driver: check for new equipment, extended opening hours, or loads left on after hours.";
+          const modelPct = site.hasOwnCooling ? weatherExpectedPct(b.billMonth, prior.map((p) => p.billMonth)) : 0;
+          // Peer sites with their own cooling saw the same weather: their actual change caps the weather explanation.
+          const peerChanges: number[] = [];
+          for (const [otherId, otherBills] of grouped) {
+            if (otherId === siteId || !siteById.get(otherId)?.hasOwnCooling) continue;
+            const j = otherBills.findIndex((x) => x.billMonth === b.billMonth);
+            const otherPrior = j >= 0 ? otherBills.slice(Math.max(0, j - t.baselineMonths), j) : [];
+            if (otherPrior.length >= 2 && otherPrior.every((p) => p.kwh > 0)) {
+              const ob = median(otherPrior.map(kwhPerDay));
+              peerChanges.push(((kwhPerDay(otherBills[j]) - ob) / ob) * 100);
+            }
+          }
+          const peerPct = peerChanges.length ? median(peerChanges) : null;
+          const weatherPct = site.hasOwnCooling ? (peerPct === null ? modelPct : Math.max(0, Math.min(modelPct, peerPct))) : 0;
+          const weatherAdjPct = pct - weatherPct;
+          const weatherNote =
+            weatherPct >= 1
+              ? ` Weather (cooling degree-days) explains about ${Math.round(weatherPct)} points of the ${Math.round(pct)}%; the remaining ${Math.round(weatherAdjPct)}% is not seasonal.`
+              : site.hasOwnCooling && peerPct !== null && modelPct >= 1
+                ? ` Not weather: comparable sites changed ${peerPct >= 0 ? "+" : ""}${Math.round(peerPct)}% in the same month.`
+                : "";
+          const whyHint =
+            (summer && site.hasOwnCooling
+              ? "Summer month at a site with its own cooling: check AC set-points, schedules and filter condition first, then after-hours equipment."
+              : summer
+                ? "Summer month: check tenant-side cooling/ventilation and any new equipment; compare with peer branches for the same month."
+                : "No seasonal driver: check for new equipment, extended opening hours, or loads left on after hours.") + weatherNote;
           const trace: CalcLine[] = [
             ...prior.map<CalcLine>((p) => ({
               label: `${monthLabel(p.billMonth)} usage`,
@@ -209,6 +232,14 @@ export function analyse(sites: Site[], allBills: Bill[], settings: Settings): Fi
             { label: `Baseline (median of ${prior.length} months)`, formula: "median(prior kWh/day)", value: round2(base), unit: "kWh/day" },
             { label: `${monthLabel(b.billMonth)} usage`, formula: `${b.kwh} kWh ÷ ${days} days`, value: round2(cur), unit: "kWh/day" },
             { label: "Change vs baseline", formula: "(current − baseline) ÷ baseline", value: round2(pct), unit: "%" },
+            ...(site.hasOwnCooling
+              ? <CalcLine[]>[
+                  { label: "Weather model", formula: `${COOLING_SHARE} cooling share × (CDD ${monthLabel(b.billMonth).slice(0, 3)} ÷ median CDD prior − 1)`, value: round2(modelPct), unit: "%" },
+                  ...(peerPct !== null ? [{ label: `Peer sites' change, ${monthLabel(b.billMonth).slice(0, 3)}`, formula: `median of ${peerChanges.length} cooled site${peerChanges.length === 1 ? "" : "s"} vs their baselines`, value: round2(peerPct), unit: "%" }] : []),
+                  { label: "Attributed to weather", formula: peerPct === null ? "weather model" : "min(weather model, peer change), ≥ 0", value: round2(weatherPct), unit: "%" },
+                  { label: "Weather-adjusted change", formula: "change − attributed to weather", value: round2(weatherAdjPct), unit: "%" },
+                ]
+              : []),
             { label: "Excess consumption", formula: `(current − baseline) × ${days} days`, value: excessKwh, unit: "kWh" },
             { label: "Marginal all-in rate", formula: "(slab rate + surcharge) × (1 + VAT)", value: rate, unit: "AED" },
             { label: "Estimated excess cost", formula: "excess kWh × marginal rate", value: excessAed, unit: "AED" },
@@ -221,7 +252,7 @@ export function analyse(sites: Site[], allBills: Bill[], settings: Settings): Fi
             billMonth: b.billMonth,
             headline: `${site.name} electricity use rose ${Math.round(pct)}% versus its recent baseline in ${monthLabel(b.billMonth)}`,
             whyHint,
-            metrics: { pct: round2(pct), baselineKwhPerDay: round2(base), currentKwhPerDay: round2(cur), excessKwh, excessAed, days },
+            metrics: { pct: round2(pct), weatherPct: round2(weatherPct), weatherAdjPct: round2(weatherAdjPct), baselineKwhPerDay: round2(base), currentKwhPerDay: round2(cur), excessKwh, excessAed, days },
             evidenceBillIds: [b.id, ...prior.map((p) => p.id)],
             calcTrace: trace,
             excessKwh,
@@ -412,4 +443,60 @@ export function summarise(sites: Site[], bills: Bill[], findings: Finding[]): Si
       topSeverity: top,
     };
   });
+}
+
+export interface RealisedSaving {
+  /** Latest bill after the flagged month. */
+  billId: string;
+  billMonth: string;
+  flaggedKwhPerDay: number;
+  latestKwhPerDay: number;
+  /** kWh avoided over the latest bill's period versus the flagged month's run-rate. */
+  realisedKwh: number;
+  realisedAed: number;
+  /** Scenario (or committed target) the team set out to achieve, in AED for the same period. */
+  targetAed: number;
+  achievedPct: number;
+  calcTrace: CalcLine[];
+}
+
+/**
+ * Compares the newest bill after a consumption finding against the flagged month's kWh/day.
+ * Returns null while no later bill exists ("awaiting next bill").
+ */
+export function realisedSaving(f: Finding, site: Site, bills: Bill[], settings: Settings, targetKwh?: number): RealisedSaving | null {
+  const later = bills
+    .filter((b) => b.siteId === f.siteId && b.status === "ok" && b.billMonth > f.billMonth)
+    .sort((a, b) => a.billMonth.localeCompare(b.billMonth));
+  const latest = later[later.length - 1];
+  const flagged = f.metrics.currentKwhPerDay;
+  if (!latest || flagged === undefined || flagged <= 0) return null;
+
+  const days = periodDays(latest);
+  const latestPerDay = kwhPerDay(latest);
+  const realisedKwh = round2((flagged - latestPerDay) * days);
+  const rate = marginalRate(Math.max(latest.kwh, realisedKwh), settings.tariff, site.premisesType, latest.fuelSurchargeRate);
+  const realisedAed = round2(realisedKwh * rate);
+  const targetKwhForPeriod = targetKwh && targetKwh > 0 ? targetKwh : f.excessKwh;
+  const targetAed = round2(targetKwhForPeriod * rate);
+  const achievedPct = targetAed > 0 ? round2((realisedAed / targetAed) * 100) : 0;
+
+  return {
+    billId: latest.id,
+    billMonth: latest.billMonth,
+    flaggedKwhPerDay: round2(flagged),
+    latestKwhPerDay: round2(latestPerDay),
+    realisedKwh,
+    realisedAed,
+    targetAed,
+    achievedPct,
+    calcTrace: [
+      { label: `${monthLabel(f.billMonth)} (flagged) usage`, formula: "from finding", value: round2(flagged), unit: "kWh/day" },
+      { label: `${monthLabel(latest.billMonth)} usage`, formula: `${latest.kwh} kWh ÷ ${days} days`, value: round2(latestPerDay), unit: "kWh/day" },
+      { label: "Avoided consumption", formula: `(flagged − latest) × ${days} days`, value: realisedKwh, unit: "kWh" },
+      { label: "Marginal all-in rate", formula: "(slab rate + surcharge) × (1 + VAT)", value: rate, unit: "AED" },
+      { label: "Realised saving", formula: "avoided kWh × marginal rate", value: realisedAed, unit: "AED" },
+      { label: "Target for the period", formula: `${targetKwhForPeriod} kWh × marginal rate`, value: targetAed, unit: "AED" },
+    ],
+  };
 }

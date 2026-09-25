@@ -24,7 +24,7 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 function emptyStore(): Store {
-  return { sites: [], bills: [], files: [], settings: DEFAULT_SETTINGS, explanations: {}, contractors: DEFAULT_CONTRACTORS };
+  return { sites: [], bills: [], files: [], settings: DEFAULT_SETTINGS, explanations: {}, contractors: DEFAULT_CONTRACTORS, actions: {} };
 }
 
 export function sampleStore(): Store {
@@ -35,6 +35,7 @@ export function sampleStore(): Store {
     settings: DEFAULT_SETTINGS,
     explanations: {},
     contractors: DEFAULT_CONTRACTORS,
+    actions: {},
   };
 }
 
@@ -47,6 +48,7 @@ export function readStore(): Store {
       ...parsed,
       settings: { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) },
       contractors: parsed.contractors ?? DEFAULT_CONTRACTORS,
+      actions: parsed.actions ?? {},
     };
   } catch {
     return emptyStore();

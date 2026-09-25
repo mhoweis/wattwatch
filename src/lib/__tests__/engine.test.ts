@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { calcBill, DEFAULT_TARIFF, scenarioSaving, splitIntoSlabs } from "../tariff";
-import { analyse, moneyAtStake } from "../analysis";
+import { calcBill, DEFAULT_TARIFF, round2, scenarioSaving, splitIntoSlabs } from "../tariff";
+import { analyse, moneyAtStake, realisedSaving } from "../analysis";
+import { weatherExpectedPct } from "../weather";
 import { parseCsv, toBill, type BillExtraction } from "../extract";
 import type { Bill, Site } from "../types";
 import { buildSampleBills, SAMPLE_SITES } from "../sample";
@@ -143,5 +144,61 @@ describe("business value and edge cases", () => {
     expect(c.rows).toHaveLength(0);
     expect(c.errors.length).toBeGreaterThan(0);
     expect(parseCsv("").rows).toHaveLength(0);
+  });
+});
+
+describe("weather adjustment and verified savings", () => {
+  const settings = DEFAULT_SETTINGS;
+  const site: Site = { id: "s", name: "Shop — Deira", dewaAccountNo: "1", premisesType: "commercial", hasOwnCooling: true };
+  const mk = (month: string, kwh: number): Bill => {
+    const x: BillExtraction = {
+      accountNo: "1",
+      premisesName: site.name,
+      tariffCategory: "commercial",
+      periodStart: `${month}-01`,
+      periodEnd: `${month}-28`,
+      kwh,
+      fuelSurchargeRate: 0.06,
+      meterCharge: 35,
+      vatAmount: null,
+      totalAed: calcBill(kwh, DEFAULT_TARIFF, "commercial", 0.06, 35).total,
+      confidence: 1,
+      fieldSources: {},
+    };
+    return { ...toBill(x, site.id, site.premisesType, settings, "csv"), id: `b-${month}` };
+  };
+
+  it("attributes part of a summer spike to cooling degree-days and reports the weather-adjusted change", () => {
+    const pct = weatherExpectedPct("2026-07", ["2026-04", "2026-05", "2026-06"]);
+    expect(pct).toBeGreaterThan(0);
+    expect(pct).toBeLessThan(20);
+    const bills = [mk("2026-04", 5000), mk("2026-05", 5000), mk("2026-06", 5000), mk("2026-07", 6500)];
+    const spike = analyse([site], bills, settings).find((f) => f.type === "SPIKE_VS_BASELINE");
+    expect(spike).toBeDefined();
+    expect(spike!.metrics.weatherPct).toBeCloseTo(round2(pct), 1);
+    expect(spike!.metrics.weatherAdjPct).toBeCloseTo(spike!.metrics.pct - spike!.metrics.weatherPct, 1);
+    expect(spike!.calcTrace.some((l) => l.label === "Weather-adjusted change")).toBe(true);
+  });
+
+  it("does not add weather lines for sites without their own cooling", () => {
+    const dc: Site = { ...site, hasOwnCooling: false };
+    const bills = [mk("2026-04", 5000), mk("2026-05", 5000), mk("2026-06", 5000), mk("2026-07", 6500)];
+    const spike = analyse([dc], bills, settings).find((f) => f.type === "SPIKE_VS_BASELINE")!;
+    expect(spike.metrics.weatherPct).toBe(0);
+    expect(spike.calcTrace.some((l) => l.label === "Weather-adjusted change")).toBe(false);
+  });
+
+  it("reports realised saving against the flagged run-rate once a later bill exists", () => {
+    const bills = [mk("2026-04", 5000), mk("2026-05", 5000), mk("2026-06", 5000), mk("2026-07", 6500)];
+    const spike = analyse([site], bills, settings).find((f) => f.type === "SPIKE_VS_BASELINE")!;
+    expect(realisedSaving(spike, site, bills, settings)).toBeNull();
+
+    const withAugust = [...bills, mk("2026-08", 5200)];
+    const r = realisedSaving(spike, site, withAugust, settings)!;
+    expect(r.billMonth).toBe("2026-08");
+    expect(r.realisedKwh).toBeCloseTo(1300, 0);
+    expect(r.realisedAed).toBeCloseTo(1300 * (0.32 + 0.06) * 1.05, 0);
+    expect(r.achievedPct).toBeGreaterThan(80);
+    expect(r.achievedPct).toBeLessThan(100);
   });
 });

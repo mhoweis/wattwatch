@@ -4,8 +4,12 @@ import type { Finding, Severity } from "@/lib/types";
 import { monthLabel } from "@/lib/analysis";
 import { fmtAed } from "@/lib/tariff";
 
-export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`rounded-lg border border-slate-200 bg-white p-4 shadow-sm ${className}`}>{children}</div>;
+export function Card({ children, className = "", id }: { children: ReactNode; className?: string; id?: string }) {
+  return (
+    <div id={id} className={`rounded-lg border border-slate-200 bg-white p-4 shadow-sm ${className}`}>
+      {children}
+    </div>
+  );
 }
 
 export function Stat({ label, value, sub }: { label: string; value: ReactNode; sub?: ReactNode }) {
@@ -43,7 +47,7 @@ export function findingHref(f: Finding) {
   return `/findings/${encodeURIComponent(f.id)}`;
 }
 
-export function FindingRow({ f }: { f: Finding }) {
+export function FindingRow({ f, status }: { f: Finding; status?: ReactNode }) {
   return (
     <Link href={findingHref(f)} className="block rounded-lg border border-slate-200 bg-white p-4 active:bg-amber-50 hover:border-amber-400 hover:shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2 sm:hidden">
@@ -66,6 +70,7 @@ export function FindingRow({ f }: { f: Finding }) {
             <span>{typeLabel[f.type]}</span>
             <span>{monthLabel(f.billMonth)}</span>
             <span>{f.evidenceBillIds.length} evidence bill{f.evidenceBillIds.length === 1 ? "" : "s"}</span>
+            {status}
           </div>
         </div>
         {f.excessAed > 0 && (

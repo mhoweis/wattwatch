@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { analyse, kwhPerDay, monthLabel, periodDays } from "@/lib/analysis";
+import { analyse, kwhPerDay, monthLabel, periodDays, realisedSaving } from "@/lib/analysis";
 import { readStore } from "@/lib/store";
 import { fmtAed, round2 } from "@/lib/tariff";
 import { Card, SeverityBadge, typeLabel } from "@/components/ui";
@@ -8,6 +8,7 @@ import { TrendChart } from "@/components/TrendChart";
 import { ExcessChart, MismatchChart, PeerChart } from "@/components/charts";
 import { ScenarioSlider } from "@/components/ScenarioSlider";
 import { ContractorPanel } from "@/components/ContractorPanel";
+import { ActionTracker } from "@/components/ActionTracker";
 import { ExplainPanel } from "./ExplainPanel";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,8 @@ export default async function FindingPage({ params }: PageProps<"/findings/[id]"
   const isConsumption = f.type === "SPIKE_VS_BASELINE" || f.type === "SUSTAINED_DRIFT" || f.type === "SLAB_BAND_JUMP" || f.type === "PEER_OUTLIER";
   const explanation = store.explanations[f.id];
   const evidenceIds = new Set(f.evidenceBillIds);
+  const record = store.actions[f.id];
+  const realised = isConsumption ? realisedSaving(f, site, store.bills, store.settings, record?.targetKwh) : null;
 
   const peerMonths = [...new Set(evidence.map((b) => b.billMonth))].sort();
   const peerSites = store.sites
@@ -124,6 +127,7 @@ export default async function FindingPage({ params }: PageProps<"/findings/[id]"
             meterCharge={focusBill.meterCharge}
             initialReduction={f.excessKwh > 0 ? f.excessKwh : focusBill.kwh * 0.1}
             emissionFactor={store.settings.emissionFactor}
+            hasOwnCooling={site.hasOwnCooling}
           />
         </Card>
       )}
@@ -166,6 +170,8 @@ export default async function FindingPage({ params }: PageProps<"/findings/[id]"
           </tbody>
         </table>
       </Card>
+
+      <ActionTracker finding={f} record={record} realised={realised} isConsumption={isConsumption} />
 
       <ExplainPanel findingId={f.id} initial={explanation ?? null} />
       <ContractorPanel finding={f} site={site} contractors={store.contractors} />

@@ -10,7 +10,7 @@ import { explainFinding } from "@/lib/explain";
 import { csvRowToExtraction, extractBill, parseCsv, toBill } from "@/lib/extract";
 import { addBill, addFile, loadSample, readStore, resetStore, saveExplanation, update, UPLOAD_DIR, upsertSiteByAccount } from "@/lib/store";
 import { SPECIALTY_LABEL } from "@/lib/contractors";
-import type { Bill, PremisesType, Settings, Specialty } from "@/lib/types";
+import type { ActionStatus, Bill, PremisesType, Settings, Specialty } from "@/lib/types";
 
 export async function loadSampleAction() {
   loadSample();
@@ -183,4 +183,27 @@ export async function updateSiteAction(formData: FormData) {
   });
   revalidatePath("/", "layout");
   redirect("/settings?saved=1");
+}
+
+export async function updateActionStatus(formData: FormData) {
+  const findingId = String(formData.get("findingId") ?? "");
+  const status = String(formData.get("status") ?? "open");
+  if (!findingId || !["open", "assigned", "done"].includes(status)) return;
+  const owner = String(formData.get("owner") ?? "").trim() || undefined;
+  const dueDate = String(formData.get("dueDate") ?? "").trim() || undefined;
+  const target = Number(String(formData.get("targetKwh") ?? "").replace(/,/g, ""));
+
+  update((s) => {
+    s.actions[findingId] = {
+      findingId,
+      status: status as ActionStatus,
+      owner,
+      dueDate,
+      targetKwh: Number.isFinite(target) && target > 0 ? Math.round(target) : undefined,
+      updatedAt: new Date().toISOString(),
+    };
+  });
+
+  revalidatePath("/", "layout");
+  redirect(`/findings/${encodeURIComponent(findingId)}#action`);
 }

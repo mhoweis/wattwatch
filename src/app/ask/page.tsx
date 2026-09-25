@@ -8,6 +8,7 @@ import type { Answer } from "@/lib/ask";
 const suggestions = [
   "Which branch cost the most in July and why?",
   "What should we investigate first?",
+  "What is refundable and how much money is at stake?",
   "Total spend for Branch C",
   "Tell me about Branch B",
 ];

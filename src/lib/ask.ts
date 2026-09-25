@@ -1,4 +1,4 @@
-import { analyse, kwhPerDay, monthLabel } from "./analysis";
+import { analyse, kwhPerDay, moneyAtStake, monthLabel } from "./analysis";
 import { getOpenAI, MODEL } from "./ai";
 import { fmtAed, round2 } from "./tariff";
 import type { Bill, Finding, Site, Store } from "./types";
@@ -65,6 +65,24 @@ export function answerByRules(q: string, store: Store, findings: Finding[]): Ans
     };
   }
 
+  if (/refund|dispute|billing error|overcharg|claim|wrong tariff|money|at stake|saving|save|opportunit/.test(ql)) {
+    const stake = moneyAtStake(store.sites, findings);
+    const refunds = findings.filter((f) => f.type === "TOTAL_MISMATCH" && (f.metrics.recoverableAed ?? 0) > 0);
+    const parts = [
+      `Efficiency opportunity: ${fmtAed(stake.efficiencyMonthlyAed)}/month (${fmtAed(stake.efficiencyAnnualAed)} annualised, scenario — excess above baseline counted once per site-month).`,
+      stake.recoverableAed > 0
+        ? `Refund to claim: ${fmtAed(stake.recoverableAed)} — ${refunds.map((f) => f.headline).join("; ")}.`
+        : "No billing errors found, so nothing to dispute with DEWA.",
+      stake.bySite.length ? `By site: ${stake.bySite.map((s) => `${s.name.split(" — ")[0]} ${fmtAed(s.efficiencyAed + s.recoverableAed)}`).join(", ")}.` : "",
+    ].filter(Boolean);
+    return {
+      text: parts.join(" "),
+      citations: refunds.flatMap((f) => f.evidenceBillIds.slice(0, 1).map((id) => bills.find((b) => b.id === id)).filter((b): b is Bill => Boolean(b)).map((b) => cite(b, siteById.get(b.siteId)))),
+      findingIds: [...refunds.map((f) => f.id), ...findings.filter((f) => f.excessAed > 0 && f.type !== "TOTAL_MISMATCH").slice(0, 3).map((f) => f.id)],
+      model: "rules",
+    };
+  }
+
   if (/finding|investigate|priorit|first|problem|issue|anomal/.test(ql)) {
     const top = findings.slice(0, 3);
     return {
@@ -76,7 +94,7 @@ export function answerByRules(q: string, store: Store, findings: Finding[]): Ans
   }
 
   return {
-    text: "I can answer questions like “which branch cost most in July and why?”, “total spend for Branch C”, “what should we investigate first?”, or ask about a specific branch. Set OPENAI_API_KEY for free-form questions.",
+    text: "I can answer questions like “which branch cost most in July and why?”, “total spend for Branch C”, “what should we investigate first?”, “what is refundable?”, or ask about a specific branch. Set OPENAI_API_KEY for free-form questions.",
     citations: [],
     findingIds: [],
     model: "rules",

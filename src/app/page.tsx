@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { analyse, moneyAtStake, monthLabel, summarise } from "@/lib/analysis";
+import { analyse, moneyAtStake, monthLabel, realisedSaving, summarise } from "@/lib/analysis";
+import { StatusPill } from "@/components/ActionTracker";
 import { readStore } from "@/lib/store";
 import { fmtAed } from "@/lib/tariff";
 import { Card, Empty, FindingRow, SeverityBadge, Stat } from "@/components/ui";
@@ -43,6 +44,17 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
   const stake = moneyAtStake(store.sites, findings);
   const co2 = store.settings.emissionFactor.enabled ? (totalKwh * store.settings.emissionFactor.kgCo2ePerKwh) / 1000 : null;
 
+  const realisedById = new Map(
+    findings.map((f) => {
+      const site = store.sites.find((s) => s.id === f.siteId);
+      const rec = store.actions[f.id];
+      return [f.id, site && rec?.status === "done" ? realisedSaving(f, site, store.bills, store.settings, rec.targetKwh) : null] as const;
+    }),
+  );
+  const verifiedAed = [...realisedById.values()].reduce((a, r) => a + Math.max(0, r?.realisedAed ?? 0), 0);
+  const doneCount = findings.filter((f) => store.actions[f.id]?.status === "done").length;
+  const inProgress = findings.filter((f) => store.actions[f.id]?.status === "assigned").length;
+
   return (
     <div className="space-y-6">
       <div className="flex items-end justify-between gap-3">
@@ -57,10 +69,15 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5 md:gap-4">
         <Stat label="Total spend" value={fmtAed(totalAed)} sub={`${totalKwh.toLocaleString()} kWh`} />
         <Stat label="Efficiency opportunity" value={fmtAed(stake.efficiencyMonthlyAed)} sub={`/month · ${fmtAed(stake.efficiencyAnnualAed)} annualised (scenario)`} />
         <Stat label="Refund to claim" value={fmtAed(stake.recoverableAed)} sub={stake.recoverableAed > 0 ? "billing errors to dispute with DEWA" : "no billing errors found"} />
+        <Stat
+          label="Verified saved"
+          value={fmtAed(verifiedAed)}
+          sub={doneCount > 0 ? `${doneCount} action${doneCount === 1 ? "" : "s"} done · ${inProgress} in progress · measured on the next bill` : inProgress > 0 ? `${inProgress} action${inProgress === 1 ? "" : "s"} in progress` : "mark actions done on a finding to track realised savings"}
+        />
         <Stat
           label="Scope 2 (location-based)"
           value={co2 !== null ? `${co2.toFixed(1)} tCO₂e` : "—"}
@@ -140,7 +157,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
         ) : (
           <div className="space-y-2">
             {shown.map((f) => (
-              <FindingRow key={f.id} f={f} />
+              <FindingRow key={f.id} f={f} status={store.actions[f.id] ? <StatusPill status={store.actions[f.id].status} realised={realisedById.get(f.id)} /> : undefined} />
             ))}
           </div>
         )}

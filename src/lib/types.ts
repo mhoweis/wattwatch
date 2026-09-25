@@ -166,6 +166,18 @@ export interface ActionItem {
   checks_ar: string[];
 }
 
+export type ActionStatus = "open" | "assigned" | "done";
+
+export interface ActionRecord {
+  findingId: string;
+  status: ActionStatus;
+  owner?: string;
+  dueDate?: string;
+  /** kWh reduction the team committed to (from the scenario slider). */
+  targetKwh?: number;
+  updatedAt: string;
+}
+
 export interface Store {
   sites: Site[];
   bills: Bill[];
@@ -173,4 +185,5 @@ export interface Store {
   settings: Settings;
   explanations: Record<string, Explanation>;
   contractors: Contractor[];
+  actions: Record<string, ActionRecord>;
 }
